@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
@@ -9,24 +30,26 @@ import MuseScore.UserScores 1.0
 FlatButton {
     id: root
 
-    height: 96
-
     property var model: null
 
-    property var arrowX
-    property var popupPositionX
-    property var popupPositionY: height
-    property alias oppened: popup.visible
-
-    accentButton: oppened
+    height: 96
+    accentButton: popup.visible
 
     StyledTextLabel {
-        anchors.horizontalCenter: root.horizontalCenter
-        anchors.verticalCenter: root.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+
+        property string pickupMessage: {
+            if (withPickupMeasure.checked) {
+                return qsTrc("userscores", "Pickup: ") +
+                        model.pickupTimeSignature.numerator + "/" + model.pickupTimeSignature.denominator
+            }
+
+            return qsTrc("userscores", "No pickup")
+        }
 
         font: ui.theme.tabFont
-        text: model.measureCount + qsTrc("userscores", " measures,\n Pickup: ") +
-              model.pickupTimeSignature.numerator + "/" + model.pickupTimeSignature.denominator
+        text: model.measureCount + qsTrc("userscores", " measures, \n") + pickupMessage
     }
 
     onClicked: {
@@ -43,9 +66,9 @@ FlatButton {
         implicitHeight: 310
         implicitWidth: 320
 
-        arrowX: root.arrowX
-        x: popupPositionX
-        y: popupPositionY
+        x: root.x - (width - root.width)
+        y: root.height
+        arrowX: root.x + root.width
 
         Column {
             anchors.fill: parent
@@ -112,9 +135,7 @@ FlatButton {
                 IncrementalPropertyControl {
                     id: measuresCountControl
 
-                    implicitWidth: 80
-
-                    enabled: withPickupMeasure.checked
+                    implicitWidth: 68
 
                     iconMode: iconModeEnum.hidden
                     currentValue: root.model.measureCount

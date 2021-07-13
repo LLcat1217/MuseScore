@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "shortcutsmodule.h"
 
 #include <QtQml>
@@ -28,13 +31,23 @@
 #include "internal/shortcutscontroller.h"
 #include "internal/midiremote.h"
 #include "internal/shortcutsconfiguration.h"
+#include "view/shortcutsmodel.h"
+#include "view/editshortcutmodel.h"
+#include "view/mididevicemappingmodel.h"
+#include "view/editmidimappingmodel.h"
 
 #include "ui/iuiengine.h"
 
+#include "diagnostics/idiagnosticspathsregister.h"
+
 using namespace mu::shortcuts;
 using namespace mu::framework;
+using namespace mu::modularity;
+using namespace mu::ui;
 
-static ShortcutsRegister* m_shortcutsRegister = new ShortcutsRegister();
+static std::shared_ptr<ShortcutsRegister> s_shortcutsRegister = std::make_shared<ShortcutsRegister>();
+static std::shared_ptr<ShortcutsConfiguration> s_configuration = std::make_shared<ShortcutsConfiguration>();
+static std::shared_ptr<MidiRemote> s_midiRemote = std::make_shared<MidiRemote>();
 
 static void shortcuts_init_qrc()
 {
@@ -48,10 +61,10 @@ std::string ShortcutsModule::moduleName() const
 
 void ShortcutsModule::registerExports()
 {
-    ioc()->registerExport<IShortcutsRegister>(moduleName(), m_shortcutsRegister);
+    ioc()->registerExport<IShortcutsRegister>(moduleName(), s_shortcutsRegister);
     ioc()->registerExport<IShortcutsController>(moduleName(), new ShortcutsController());
-    ioc()->registerExport<IMidiRemote>(moduleName(), new MidiRemote());
-    ioc()->registerExport<IShortcutsConfiguration>(moduleName(), new ShortcutsConfiguration());
+    ioc()->registerExport<IMidiRemote>(moduleName(), s_midiRemote);
+    ioc()->registerExport<IShortcutsConfiguration>(moduleName(), s_configuration);
 }
 
 void ShortcutsModule::registerResources()
@@ -62,8 +75,12 @@ void ShortcutsModule::registerResources()
 void ShortcutsModule::registerUiTypes()
 {
     qmlRegisterType<ShortcutsInstanceModel>("MuseScore.Shortcuts", 1, 0, "ShortcutsInstanceModel");
+    qmlRegisterType<ShortcutsModel>("MuseScore.Shortcuts", 1, 0, "ShortcutsModel");
+    qmlRegisterType<EditShortcutModel>("MuseScore.Shortcuts", 1, 0, "EditShortcutModel");
+    qmlRegisterType<MidiDeviceMappingModel>("MuseScore.Shortcuts", 1, 0, "MidiDeviceMappingModel");
+    qmlRegisterType<EditMidiMappingModel>("MuseScore.Shortcuts", 1, 0, "EditMidiMappingModel");
 
-    framework::ioc()->resolve<framework::IUiEngine>(moduleName())->addSourceImportPath(shortcuts_QML_IMPORT);
+    ioc()->resolve<IUiEngine>(moduleName())->addSourceImportPath(shortcuts_QML_IMPORT);
 }
 
 void ShortcutsModule::onInit(const IApplication::RunMode& mode)
@@ -71,5 +88,15 @@ void ShortcutsModule::onInit(const IApplication::RunMode& mode)
     if (mode == IApplication::RunMode::Converter) {
         return;
     }
-    m_shortcutsRegister->load();
+
+    s_configuration->init();
+    s_shortcutsRegister->load();
+    s_midiRemote->load();
+
+    auto pr = ioc()->resolve<diagnostics::IDiagnosticsPathsRegister>(moduleName());
+    if (pr) {
+        pr->reg("shortcutsUserAppDataPath", s_configuration->shortcutsUserAppDataPath());
+        pr->reg("shortcutsAppDataPath", s_configuration->shortcutsAppDataPath());
+        pr->reg("midiMappingUserAppDataPath", s_configuration->midiMappingUserAppDataPath());
+    }
 }

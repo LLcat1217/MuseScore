@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
@@ -5,13 +26,12 @@ import MuseScore.UiComponents 1.0
 import MuseScore.Ui 1.0
 import "../../common"
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property QtObject model: null
 
-    implicitHeight: contentColumn.implicitHeight + topPadding + bottomPadding
-    width: parent.width
+    contentHeight: contentColumn.implicitHeight
 
     Column {
         id: contentColumn
@@ -31,13 +51,13 @@ StyledPopup {
                 anchors.right: lockButton.left
                 anchors.rightMargin: 6
 
-                titleText: qsTr("Image height")
+                titleText: qsTrc("inspector", "Image height")
                 propertyItem: model ? model.height : null
 
                 IncrementalPropertyControl {
 
                     icon: IconCode.VERTICAL
-                    measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTr("sp") : qsTr("mm")
+                    measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("inspector", "sp") : qsTrc("inspector", "mm")
                     isIndeterminate: model ? model.height.isUndefined : false
                     currentValue: model ? model.height.value : 0
 
@@ -45,7 +65,7 @@ StyledPopup {
                 }
             }
 
-            FlatToogleButton {
+            FlatToggleButton {
                 id: lockButton
 
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -68,13 +88,13 @@ StyledPopup {
                 anchors.leftMargin: 6
                 anchors.right: parent.right
 
-                titleText: qsTr("Image width")
+                titleText: qsTrc("inspector", "Image width")
                 propertyItem: model ? model.width : null
 
                 IncrementalPropertyControl {
                     icon: IconCode.HORIZONTAL
                     iconMode: iconModeEnum.right
-                    measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTr("sp") : qsTr("mm")
+                    measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("inspector", "sp") : qsTrc("inspector", "mm")
                     isIndeterminate: model ? model.width.isUndefined : false
                     currentValue: model ? model.width.value : 0
 
@@ -89,7 +109,7 @@ StyledPopup {
             enabled: model ? model.shouldScaleToFrameSize.isEnabled : false
             isIndeterminate: model ? model.shouldScaleToFrameSize.isUndefined : false
             checked: model && !isIndeterminate ? model.shouldScaleToFrameSize.value : false
-            text: qsTr("Scale to frame size")
+            text: qsTrc("inspector", "Scale to frame size")
 
             onClicked: { model.shouldScaleToFrameSize.value = !checked }
         }
@@ -99,7 +119,7 @@ StyledPopup {
 
             isIndeterminate: model ? model.isSizeInSpatiums.isUndefined : false
             checked: model && !isIndeterminate ? model.isSizeInSpatiums.value : false
-            text: qsTr("Use staff space units")
+            text: qsTrc("inspector", "Use staff space units")
 
             onClicked: { model.isSizeInSpatiums.value = !checked }
         }

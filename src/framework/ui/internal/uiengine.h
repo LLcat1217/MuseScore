@@ -1,30 +1,33 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
-#ifndef MU_FRAMEWORK_UIENGINE_H
-#define MU_FRAMEWORK_UIENGINE_H
+#ifndef MU_UI_UIENGINE_H
+#define MU_UI_UIENGINE_H
 
 #include <QObject>
 #include <memory>
 
 #include "../iuiengine.h"
-#include "../view/theme.h"
+#include "../view/uitheme.h"
 #include "../view/qmltooltip.h"
 #include "../view/qmltranslation.h"
 #include "../view/interactiveprovider.h"
@@ -32,13 +35,15 @@
 
 class QQmlEngine;
 
-namespace mu::framework {
+namespace mu::ui {
 class UiEngine : public QObject, public IUiEngine
 {
     Q_OBJECT
 
-    Q_PROPERTY(Theme * theme READ theme NOTIFY themeChanged)
+    Q_PROPERTY(UiTheme * theme READ theme NOTIFY themeChanged)
     Q_PROPERTY(QmlToolTip * tooltip READ tooltip CONSTANT)
+
+    Q_PROPERTY(QQuickItem * rootItem READ rootItem WRITE setRootItem NOTIFY rootItemChanged)
 
     // for internal use
     Q_PROPERTY(InteractiveProvider * _interactiveProvider READ interactiveProvider_property CONSTANT)
@@ -49,7 +54,7 @@ public:
     static UiEngine* instance();
 
     QmlApi* api() const;
-    Theme* theme() const;
+    UiTheme* theme() const;
     QmlToolTip* tooltip() const;
     InteractiveProvider* interactiveProvider_property() const;
     std::shared_ptr<InteractiveProvider> interactiveProvider() const;
@@ -66,8 +71,15 @@ public:
     void moveQQmlEngine(QQmlEngine* e);
     void quit();
 
+    QQuickItem* rootItem() const;
+
+public slots:
+    void setRootItem(QQuickItem* rootItem);
+
 signals:
-    void themeChanged(Theme* theme);
+    void themeChanged(UiTheme* theme);
+
+    void rootItemChanged(QQuickItem* rootItem);
 
 private:
     UiEngine();
@@ -77,12 +89,13 @@ private:
 
     QQmlEngine* m_engine = nullptr;
     QStringList m_sourceImportPaths;
-    Theme* m_theme = nullptr;
+    UiTheme* m_theme = nullptr;
     QmlTranslation* m_translation = nullptr;
     std::shared_ptr<InteractiveProvider> m_interactiveProvider = nullptr;
     QmlApi* m_api = nullptr;
     QmlToolTip* m_tooltip = nullptr;
+    QQuickItem* m_rootItem = nullptr;
 };
 }
 
-#endif // MU_FRAMEWORK_UIENGINE_H
+#endif // MU_UI_UIENGINE_H

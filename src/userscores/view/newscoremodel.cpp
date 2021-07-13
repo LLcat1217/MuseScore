@@ -1,52 +1,71 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "newscoremodel.h"
 
 #include "log.h"
 
+#include "ui/view/musicalsymbolcodes.h"
+
 using namespace mu::userscores;
-using namespace mu::actions;
 using namespace mu::notation;
-using namespace mu::instruments;
+using namespace mu::ui;
+
+using PreferredScoreCreationMode = IUserScoresConfiguration::PreferredScoreCreationMode;
 
 NewScoreModel::NewScoreModel(QObject* parent)
     : QObject(parent)
 {
 }
 
+QString NewScoreModel::preferredScoreCreationMode() const
+{
+    switch (configuration()->preferredScoreCreationMode()) {
+    case PreferredScoreCreationMode::FromInstruments: return "FromInstruments";
+    case PreferredScoreCreationMode::FromTemplate: return "FromTemplate";
+    }
+
+    return "";
+}
+
 bool NewScoreModel::createScore(const QVariant& info)
 {
     ScoreCreateOptions options = parseOptions(info.toMap());
 
-    auto notation = notationCreator()->newMasterNotation();
-    Ret ret = notation->createNew(options);
+    auto project = notationCreator()->newNotationProject();
+    Ret ret = project->createNew(options);
 
     if (!ret) {
         LOGE() << ret.toString();
         return false;
     }
 
-    if (!globalContext()->containsMasterNotation(notation->path())) {
-        globalContext()->addMasterNotation(notation);
+    if (!globalContext()->containsNotationProject(project->path())) {
+        globalContext()->addNotationProject(project);
     }
 
-    globalContext()->setCurrentMasterNotation(notation);
+    globalContext()->setCurrentNotationProject(project);
+
+    bool isScoreCreatedFromInstruments = options.templatePath.empty();
+    updatePreferredScoreCreationMode(isScoreCreatedFromInstruments);
 
     return true;
 }
@@ -62,7 +81,11 @@ ScoreCreateOptions NewScoreModel::parseOptions(const QVariantMap& info) const
     options.copyright = info["copyright"].toString();
 
     options.withTempo = info["withTempo"].toBool();
-    options.tempo = info["tempo"].toDouble();
+
+    QVariantMap tempo = info["tempo"].toMap();
+    options.tempo.valueBpm = tempo["value"].toInt();
+    options.tempo.duration = noteIconToDurationType(tempo["noteIcon"].toInt());
+    options.tempo.withDot = tempo["withDot"].toBool();
 
     QVariantMap timeSignature = info["timeSignature"].toMap();
     options.timesigType = static_cast<TimeSigType>(info["timeSignatureType"].toInt());
@@ -81,9 +104,45 @@ ScoreCreateOptions NewScoreModel::parseOptions(const QVariantMap& info) const
 
     options.templatePath = info["templatePath"].toString();
 
-    for (const QVariant& obj: info["instruments"].toList()) {
-        options.instruments << obj.value<Instrument>();
+    QVariantMap partMap = info["parts"].toMap();
+    for (const QVariant& obj: partMap["instruments"].toList()) {
+        QVariantMap objMap = obj.toMap();
+        Q_ASSERT(!objMap["isExistingPart"].toBool());
+
+        PartInstrument pi;
+
+        pi.isExistingPart = false;
+        pi.isSoloist = false;
+        pi.partId = QString();
+        pi.instrument = objMap["instrument"].value<Instrument>();
+
+        options.parts << pi;
     }
 
+    options.order = info["scoreOrder"].value<ScoreOrder>();
+
     return options;
+}
+
+DurationType NewScoreModel::noteIconToDurationType(int noteIconCode) const
+{
+    static const QMap<MusicalSymbolCodes::Code, DurationType> iconToDuration {
+        { MusicalSymbolCodes::Code::SEMIBREVE, DurationType::V_WHOLE },
+        { MusicalSymbolCodes::Code::MINIM, DurationType::V_HALF },
+        { MusicalSymbolCodes::Code::CROTCHET, DurationType::V_QUARTER },
+        { MusicalSymbolCodes::Code::QUAVER, DurationType::V_EIGHTH },
+        { MusicalSymbolCodes::Code::SEMIQUAVER, DurationType::V_16TH }
+    };
+
+    MusicalSymbolCodes::Code symbol = static_cast<MusicalSymbolCodes::Code>(noteIconCode);
+    return iconToDuration.value(symbol, DurationType::V_QUARTER);
+}
+
+void NewScoreModel::updatePreferredScoreCreationMode(bool isScoreCreatedFromInstruments)
+{
+    if (isScoreCreatedFromInstruments) {
+        configuration()->setPreferredScoreCreationMode(PreferredScoreCreationMode::FromInstruments);
+    } else {
+        configuration()->setPreferredScoreCreationMode(PreferredScoreCreationMode::FromTemplate);
+    }
 }

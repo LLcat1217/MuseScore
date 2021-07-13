@@ -1,34 +1,44 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "environment.h"
 
 #include "framework/global/globalmodule.h"
+#include "framework/system/systemmodule.h"
 
 using namespace mu::testing;
 
 Environment::Modules Environment::m_dependencyModules;
+Environment::PreInit Environment::m_preInit;
 Environment::PostInit Environment::m_postInit;
 
 void Environment::setDependency(const Modules& modules)
 {
     m_dependencyModules = modules;
+}
+
+void Environment::setPreInit(const PreInit& preInit)
+{
+    m_preInit = preInit;
 }
 
 void Environment::setPostInit(const PostInit& postInit)
@@ -45,30 +55,41 @@ void Environment::setup()
     globalModule.registerResources();
     globalModule.registerExports();
     globalModule.registerUiTypes();
-    globalModule.onInit(runMode);
 
-    //! NOTE Now we can use logger and profiler
+    m_dependencyModules.push_back(new mu::system::SystemModule());
 
-    for (mu::framework::IModuleSetup* m : m_dependencyModules) {
+    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
         m->registerResources();
     }
 
-    for (mu::framework::IModuleSetup* m : m_dependencyModules) {
+    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
         m->registerExports();
     }
 
     globalModule.resolveImports();
-    for (mu::framework::IModuleSetup* m : m_dependencyModules) {
+    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
         m->registerUiTypes();
         m->resolveImports();
     }
 
-    for (mu::framework::IModuleSetup* m : m_dependencyModules) {
+    globalModule.onInit(runMode);
+    //! NOTE Now we can use logger and profiler
+
+    if (m_preInit) {
+        m_preInit();
+    }
+
+    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
         m->onInit(runMode);
     }
 
+    globalModule.onAllInited(runMode);
+    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
+        m->onAllInited(runMode);
+    }
+
     globalModule.onStartApp();
-    for (mu::framework::IModuleSetup* m : m_dependencyModules) {
+    for (mu::modularity::IModuleSetup* m : m_dependencyModules) {
         m->onStartApp();
     }
 

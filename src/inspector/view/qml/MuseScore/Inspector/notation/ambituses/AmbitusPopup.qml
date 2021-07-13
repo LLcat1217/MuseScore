@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
@@ -6,13 +27,12 @@ import MuseScore.Ui 1.0
 import "../../common"
 import "../notes/internal"
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property QtObject model: null
 
-    implicitHeight: contentColumn.implicitHeight + topPadding + bottomPadding
-    width: parent.width
+    contentHeight: contentColumn.implicitHeight
 
     function tpcListModel() {
         return [
@@ -64,7 +84,7 @@ StyledPopup {
         FlatButton {
             width: parent.width
 
-            text: qsTr("Update to match the notes on the staff")
+            text: qsTrc("inspector", "Update to match the notes on the staff")
 
             onClicked: {
                 if (root.model) {
@@ -90,30 +110,28 @@ StyledPopup {
                 width: parent.width
 
                 InspectorPropertyView {
-                    titleText: qsTr("Top TPC")
+                    titleText: qsTrc("inspector", "Top TPC")
                     propertyItem: root.model ? root.model.topTpc : null
 
-                    StyledComboBox {
+                    Dropdown {
+                        id: ttpcs
                         anchors.left: parent.left
                         anchors.right: parent.horizontalCenter
                         anchors.rightMargin: 2
                         width: parent.width
 
-                        textRoleName: "text"
-                        valueRoleName: "value"
-
                         model: tpcListModel()
 
-                        currentIndex: root.model && !root.model.topTpc.isUndefined ? indexOfValue(root.model.topTpc.value) : -1
+                        currentIndex: root.model && !root.model.topTpc.isUndefined ? ttpcs.indexOfValue(root.model.topTpc.value) : -1
 
-                        onValueChanged: {
-                            root.model.topTpc.value = value
+                        onCurrentValueChanged: {
+                            root.model.topTpc.value = ttpcs.currentValue
                         }
                     }
                 }
 
                 InspectorPropertyView {
-                    titleText: qsTr("Top octave")
+                    titleText: qsTrc("inspector", "Top octave")
                     propertyItem: root.model ? root.model.topOctave : null
 
                     IncrementalPropertyControl {
@@ -145,21 +163,19 @@ StyledPopup {
                 height: childrenRect.height
                 width: parent.width
 
-                StyledComboBox {
+                Dropdown {
+                    id: tpcs
                     anchors.left: parent.left
                     anchors.right: parent.horizontalCenter
                     anchors.rightMargin: 2
                     width: parent.width
 
-                    textRoleName: "text"
-                    valueRoleName: "value"
-
                     model: tpcListModel()
 
-                    currentIndex: root.model && !root.model.bottomTpc.isUndefined ? indexOfValue(root.model.bottomTpc.value) : -1
+                    currentIndex: root.model && !root.model.bottomTpc.isUndefined ? tpcs.indexOfValue(root.model.bottomTpc.value) : -1
 
-                    onValueChanged: {
-                        root.model.bottomTpc.value = value
+                    onCurrentValueChanged: {
+                        root.model.bottomTpc.value = tpcs.currentValue
                     }
                 }
 
@@ -190,7 +206,7 @@ StyledPopup {
             ExpandableBlank {
                 isExpanded: false
 
-                title: isExpanded ? qsTr("Show less") : qsTr("Show more")
+                title: isExpanded ? qsTrc("inspector", "Show less") : qsTrc("inspector", "Show more")
 
                 width: parent.width
 
@@ -201,7 +217,7 @@ StyledPopup {
                     spacing: 16
 
                     InspectorPropertyView {
-                        titleText: qsTr("Direction")
+                        titleText: qsTrc("inspector", "Direction")
                         propertyItem: root.model ? root.model.direction : null
 
                         RadioButtonGroup {
@@ -235,7 +251,7 @@ StyledPopup {
                     }
 
                     InspectorPropertyView {
-                        titleText: qsTr("Head type (visual only)")
+                        titleText: qsTrc("inspector", "Head type (visual only)")
                         propertyItem: root.model ? root.model.noteheadType : null
 
                         RadioButtonGroup {
@@ -277,7 +293,7 @@ StyledPopup {
                         anchors.right: parent.horizontalCenter
                         anchors.rightMargin: 2
 
-                        titleText: qsTr("Line thickness")
+                        titleText: qsTrc("inspector", "Line thickness")
                         propertyItem: root.model ? root.model.lineThickness : null
 
                         IncrementalPropertyControl {

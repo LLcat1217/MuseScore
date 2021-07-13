@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "actionsdispatcher.h"
 #include "log.h"
 #include "actionable.h"
@@ -33,17 +36,17 @@ ActionsDispatcher::~ActionsDispatcher()
     }
 }
 
-void ActionsDispatcher::dispatch(const ActionName& action)
+void ActionsDispatcher::dispatch(const ActionCode& actionCode)
 {
     static ActionData dummy;
-    dispatch(action, dummy);
+    dispatch(actionCode, dummy);
 }
 
-void ActionsDispatcher::dispatch(const ActionName& action, const ActionData& data)
+void ActionsDispatcher::dispatch(const ActionCode& actionCode, const ActionData& data)
 {
-    auto it = m_clients.find(action);
+    auto it = m_clients.find(actionCode);
     if (it == m_clients.end()) {
-        LOGW() << "not registred action: " << action;
+        LOGW() << "not registred action: " << actionCode;
         return;
     }
 
@@ -51,22 +54,22 @@ void ActionsDispatcher::dispatch(const ActionName& action, const ActionData& dat
     const Clients& clients = it->second;
     for (auto cit = clients.cbegin(); cit != clients.cend(); ++cit) {
         const Actionable* client = cit->first;
-        if (client->canReceiveAction(action)) {
+        if (client->canReceiveAction(actionCode)) {
             ++canReceiveCount;
             const CallBacks& callbacks = cit->second;
-            auto cbit = callbacks.find(action);
+            auto cbit = callbacks.find(actionCode);
             IF_ASSERT_FAILED(cbit != callbacks.end()) {
                 continue;
             }
 
             const ActionCallBackWithNameAndData& callback = cbit->second;
-            LOGI() << "try call action: " << action;
-            callback(action, data);
+            LOGI() << "try call action: " << actionCode;
+            callback(actionCode, data);
         }
     }
 
     if (canReceiveCount == 0) {
-        LOGI() << "no one can handle the action: " << action;
+        LOGI() << "no one can handle the action: " << actionCode;
     } else if (canReceiveCount > 1) {
         LOGW() << "More than one client can handle the action, this is not a typical situation.";
     }
@@ -81,11 +84,11 @@ void ActionsDispatcher::unReg(Actionable* client)
     client->setDispatcher(nullptr);
 }
 
-void ActionsDispatcher::reg(Actionable* client, const ActionName& action, const ActionCallBackWithNameAndData& call)
+void ActionsDispatcher::reg(Actionable* client, const ActionCode& actionCode, const ActionCallBackWithNameAndData& call)
 {
     client->setDispatcher(this);
 
-    Clients& clients = m_clients[action];
+    Clients& clients = m_clients[actionCode];
     CallBacks& callbacks = clients[client];
-    callbacks.insert({ action, call });
+    callbacks.insert({ actionCode, call });
 }

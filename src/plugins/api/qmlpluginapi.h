@@ -1,14 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2012 Werner Schweer
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENCE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef __QMLPLUGINAPI_H__
 #define __QMLPLUGINAPI_H__
@@ -23,11 +33,13 @@
 #include "libmscore/score.h"
 #include "libmscore/spanner.h"
 #include "framework/shortcuts/ishortcutscontroller.h"
+#include "context/iglobalcontext.h"
 #include "modularity/ioc.h"
 
 namespace Ms {
 class Element;
 class MScore;
+class MuseScoreCore;
 
 /**
  * \namespace Ms::PluginAPI
@@ -64,6 +76,7 @@ class PluginAPI : public Ms::QmlPlugin
     Q_OBJECT
 
     INJECT(plugins, mu::shortcuts::IShortcutsController, shortcuts)
+    INJECT(userscores, mu::context::IGlobalContext, context)
 
     /** Path where the plugin is placed in menu */
     Q_PROPERTY(QString menuPath READ menuPath WRITE setMenuPath)
@@ -266,6 +279,9 @@ public:
     Q_INVOKABLE void closeLog();
 
     Q_INVOKABLE Ms::PluginAPI::FractionWrapper* fraction(int numerator, int denominator) const;
+
+protected:
+    virtual MuseScoreCore* msc() const override;
 };
 
 #undef DECLARE_API_ENUM

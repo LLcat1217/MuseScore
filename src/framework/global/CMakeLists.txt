@@ -1,21 +1,22 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2020 MuseScore BVBA and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(MODULE global)
 
@@ -35,6 +36,7 @@ set(MODULE_SRC
     ${HAW_PROFILER_SRC}
     ${CMAKE_CURRENT_LIST_DIR}/globalmodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/globalmodule.h
+    ${CMAKE_CURRENT_LIST_DIR}/globaltypes.h
     ${CMAKE_CURRENT_LIST_DIR}/iapplication.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/application.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/application.h
@@ -42,6 +44,7 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/iglobalconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/io/path.cpp
     ${CMAKE_CURRENT_LIST_DIR}/io/path.h
+    ${CMAKE_CURRENT_LIST_DIR}/io/device.h
     ${CMAKE_CURRENT_LIST_DIR}/log.h
     ${CMAKE_CURRENT_LIST_DIR}/logstream.h
     ${CMAKE_CURRENT_LIST_DIR}/dataformatter.cpp
@@ -60,6 +63,7 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/runtime.h
     ${CMAKE_CURRENT_LIST_DIR}/translation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/translation.h
+    ${CMAKE_CURRENT_LIST_DIR}/timer.h
     ${CMAKE_CURRENT_LIST_DIR}/ret.cpp
     ${CMAKE_CURRENT_LIST_DIR}/ret.h
     ${CMAKE_CURRENT_LIST_DIR}/retval.h
@@ -76,6 +80,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/xmlreader.h
     ${CMAKE_CURRENT_LIST_DIR}/xmlwriter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/xmlwriter.h
+    ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/utils.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/globalconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/globalconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/interactive.cpp

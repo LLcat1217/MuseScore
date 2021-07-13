@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "partlistmodel.h"
 
@@ -25,6 +28,7 @@
 #include "uicomponents/view/itemmultiselectionmodel.h"
 
 using namespace mu::notation;
+using namespace mu::uicomponents;
 using namespace mu::framework;
 
 PartListModel::PartListModel(QObject* parent)
@@ -37,9 +41,15 @@ void PartListModel::load()
 {
     beginResetModel();
 
-    m_notations << masterNotation();
-    for (IExcerptNotationPtr excerpt : masterNotation()->excerpts().val) {
-        m_notations << excerpt;
+    IMasterNotationPtr masterNotation = this->masterNotation();
+    if (!masterNotation) {
+        endResetModel();
+        return;
+    }
+
+    m_notations << masterNotation->notation();
+    for (IExcerptNotationPtr excerpt : masterNotation->excerpts().val) {
+        m_notations << excerpt->notation();
     }
 
     endResetModel();
@@ -71,7 +81,7 @@ QVariant PartListModel::data(const QModelIndex& index, int role) const
 
 bool PartListModel::isMainNotation(INotationPtr notation) const
 {
-    return notation == masterNotation();
+    return notation == masterNotation()->notation();
 }
 
 QString PartListModel::formatVoicesTitle(INotationPtr notation) const
@@ -154,7 +164,7 @@ void PartListModel::createNewPart()
     Meta meta;
     meta.title = qtrc("notation", "Part");
 
-    INotationPtr notation = notationCreator()->newExcerptNotation();
+    INotationPtr notation = notationCreator()->newExcerptNotation()->notation();
 
     notation->setMetaInfo(meta);
 
@@ -303,11 +313,11 @@ bool PartListModel::userAgreesToRemoveParts(int partCount) const
     QString question = mu::qtrc("notation", "Are you sure you want to delete %1?")
                        .arg(partCount > 1 ? "these parts" : "this part");
 
-    IInteractive::Button button = interactive()->question("", question.toStdString(), {
+    IInteractive::Result result = interactive()->question("", question.toStdString(), {
         IInteractive::Button::Yes, IInteractive::Button::No
     });
 
-    return button == IInteractive::Button::Yes;
+    return result.standartButton() == IInteractive::Button::Yes;
 }
 
 void PartListModel::openSelectedParts()

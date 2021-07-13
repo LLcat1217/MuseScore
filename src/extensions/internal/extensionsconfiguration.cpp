@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "extensionsconfiguration.h"
 
 #include <QVariant>
@@ -30,23 +33,32 @@ using namespace mu;
 using namespace mu::framework;
 using namespace mu::extensions;
 
-static const Settings::Key EXTENSIONS_JSON("extensions", "extensions/extensionsJson");
+static const std::string module_name("extensions");
 
-static const io::path EXTENSIONS_DIR("/extensions");
-static const io::path WORKSPACES_DIR("/workspaces");
-static const io::path INSTRUMENTS_DIR("/instruments");
-static const io::path TEMPLATES_DIR("/templates");
+static const Settings::Key EXTENSIONS_JSON(module_name, "extensions/extensionsJson");
+static const Settings::Key CHECK_FOR_UPDATE(module_name, "extensions/checkForUpdate");
+static const Settings::Key USER_EXTENSIONS_PATH(module_name, "application/paths/myExtensions");
 
-static const QString WORKSPACE_FILTER("*.workspace");
+static const io::path WORKSPACES_DIR("workspaces");
+static const io::path INSTRUMENTS_DIR("instruments");
+static const io::path TEMPLATES_DIR("templates");
+
+static const QString WORKSPACE_FILTER("*.mws");
 static const QString MSCZ_FILTER("*.mscz");
 static const QString MSCX_FILTER(".mscx");
 static const QString XML_FILTER("*.xml");
 
 void ExtensionsConfiguration::init()
 {
-    settings()->valueChanged(EXTENSIONS_JSON).onReceive(nullptr, [this](const Val& val) {
-        LOGD() << "EXTENSION_Json changed: " << val.toString();
+    settings()->setDefaultValue(CHECK_FOR_UPDATE, Val(true));
 
+    settings()->setDefaultValue(USER_EXTENSIONS_PATH, Val((globalConfiguration()->userDataPath() + "/Extensions")));
+    settings()->valueChanged(USER_EXTENSIONS_PATH).onReceive(nullptr, [this](const Val& val) {
+        m_userExtensionsPathChanged.send(val.toString());
+    });
+    fileSystem()->makePath(userExtensionsPath());
+
+    settings()->valueChanged(EXTENSIONS_JSON).onReceive(nullptr, [this](const Val& val) {
         ExtensionsHash extensionHash = parseExtensionConfig(val.toQString().toLocal8Bit());
         m_extensionHashChanged.send(extensionHash);
     });
@@ -61,6 +73,16 @@ QUrl ExtensionsConfiguration::extensionFileServerUrl(const QString& extensionCod
 {
     io::path fileName = extensionFileName(extensionCode);
     return QUrl("http://extensions.musescore.org/4.0/extensions/" + fileName.toQString());
+}
+
+bool ExtensionsConfiguration::needCheckForUpdate() const
+{
+    return settings()->value(CHECK_FOR_UPDATE).toBool();
+}
+
+void ExtensionsConfiguration::setNeedCheckForUpdate(bool needCheck)
+{
+    settings()->setSharedValue(CHECK_FOR_UPDATE, Val(needCheck));
 }
 
 ValCh<ExtensionsHash> ExtensionsConfiguration::extensions() const
@@ -85,25 +107,25 @@ Ret ExtensionsConfiguration::setExtensions(const ExtensionsHash& extensions) con
     QJsonDocument jsonDoc(jsonArray);
 
     Val value(jsonDoc.toJson(QJsonDocument::Compact).constData());
-    settings()->setValue(EXTENSIONS_JSON, value);
+    settings()->setSharedValue(EXTENSIONS_JSON, value);
 
     return make_ret(Err::NoError);
 }
 
 io::path ExtensionsConfiguration::extensionPath(const QString& extensionCode) const
 {
-    return extensionsSharePath() + "/" + extensionCode;
+    return userExtensionsPath() + "/" + extensionCode;
 }
 
 io::path ExtensionsConfiguration::extensionWorkspacesPath(const QString& extensionCode) const
 {
-    return extensionsSharePath() + "/" + extensionCode + WORKSPACES_DIR;
+    return userExtensionsPath() + "/" + extensionCode + "/" + WORKSPACES_DIR;
 }
 
 io::path ExtensionsConfiguration::extensionArchivePath(const QString& extensionCode) const
 {
     io::path fileName = extensionFileName(extensionCode);
-    return extensionsDataPath() + "/" + fileName;
+    return userExtensionsPath() + "/" + fileName;
 }
 
 ExtensionsHash ExtensionsConfiguration::parseExtensionConfig(const QByteArray& json) const
@@ -154,17 +176,7 @@ io::paths ExtensionsConfiguration::fileList(const io::path& directory, const QSt
 
 io::path ExtensionsConfiguration::extensionInstrumentsPath(const QString& extensionCode) const
 {
-    return extensionsSharePath() + "/" + extensionCode + INSTRUMENTS_DIR;
-}
-
-io::path mu::extensions::ExtensionsConfiguration::extensionsSharePath() const
-{
-    return globalConfiguration()->sharePath() + EXTENSIONS_DIR;
-}
-
-io::path ExtensionsConfiguration::extensionsDataPath() const
-{
-    return globalConfiguration()->dataPath() + EXTENSIONS_DIR;
+    return userExtensionsPath() + "/" + extensionCode + "/" + INSTRUMENTS_DIR;
 }
 
 io::paths ExtensionsConfiguration::extensionWorkspaceFiles(const QString& extensionCode) const
@@ -233,7 +245,22 @@ io::paths ExtensionsConfiguration::templatesPaths() const
     return paths;
 }
 
+io::path ExtensionsConfiguration::userExtensionsPath() const
+{
+    return settings()->value(USER_EXTENSIONS_PATH).toPath();
+}
+
+void ExtensionsConfiguration::setUserExtensionsPath(const io::path& path)
+{
+    settings()->setSharedValue(USER_EXTENSIONS_PATH, Val(path));
+}
+
+async::Channel<io::path> ExtensionsConfiguration::userExtensionsPathChanged() const
+{
+    return m_userExtensionsPathChanged;
+}
+
 io::path ExtensionsConfiguration::extensionTemplatesPath(const QString& extensionCode) const
 {
-    return extensionsSharePath() + "/" + extensionCode + TEMPLATES_DIR;
+    return userExtensionsPath() + "/" + extensionCode + "/" + TEMPLATES_DIR;
 }

@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "winmmdriver.h"
 
 #include <windows.h>
@@ -159,7 +162,7 @@ bool WinmmDriver::open(const Spec& spec, Spec* activeSpec)
     ZeroMemory(&format, sizeof(WAVEFORMATEX));
 
     format.nChannels = static_cast<WORD>(spec.channels);
-    format.nSamplesPerSec = static_cast<DWORD>(spec.freq);
+    format.nSamplesPerSec = static_cast<DWORD>(spec.sampleRate);
     format.wFormatTag = WAVE_FORMAT_PCM;
     format.wBitsPerSample = sizeof(short) * 8;
     format.nBlockAlign = (format.nChannels * format.wBitsPerSample) / 8;
@@ -212,4 +215,36 @@ void WinmmDriver::close()
 bool WinmmDriver::isOpened() const
 {
     return s_winMMData != nullptr;
+}
+
+std::string WinmmDriver::outputDevice() const
+{
+    NOT_IMPLEMENTED;
+    return "default";
+}
+
+bool WinmmDriver::selectOutputDevice(const std::string& /*name*/)
+{
+    NOT_IMPLEMENTED;
+    return false;
+}
+
+std::vector<std::string> WinmmDriver::availableOutputDevices() const
+{
+    NOT_IMPLEMENTED;
+    return { "default" };
+}
+
+mu::async::Notification WinmmDriver::availableOutputDevicesChanged() const
+{
+    NOT_IMPLEMENTED;
+    return mu::async::Notification();
+}
+
+void WinmmDriver::resume()
+{
+}
+
+void WinmmDriver::suspend()
+{
 }

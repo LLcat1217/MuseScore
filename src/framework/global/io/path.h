@@ -1,29 +1,31 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_IO_PATH_H
 #define MU_IO_PATH_H
 
 #include <QString>
 #include "framework/global/logstream.h"
 
-namespace mu {
-namespace io {
+namespace mu::io {
 struct path;
 using paths = std::vector<path>;
 struct path {
@@ -38,10 +40,15 @@ struct path {
     inline path& operator=(const QString& other) { m_path = other.toUtf8(); return *this; }
 
     inline bool operator==(const path& other) const { return m_path == other.m_path; }
+    inline bool operator!=(const path& other) const { return !(m_path == other.m_path); }
 
-    inline path operator+(const path& other) const { path p = *this; p.m_path += other.m_path; return p; }
-    inline path operator+(const QString& other) const { path p = *this; p.m_path += other.toUtf8(); return p; }
-    inline path operator+(const char* other) const { path p = *this; p.m_path += other; return p; }
+    inline path operator+(const path& other) const { path p = *this; p += other; return p; }
+    inline path operator+(const QString& other) const { path p = *this; p += other; return p; }
+    inline path operator+(const char* other) const { path p = *this; p += other; return p; }
+
+    inline path& operator+=(const path& other) { m_path += other.m_path; return *this; }
+    inline path& operator+=(const QString& other) { m_path += other.toUtf8(); return *this; }
+    inline path& operator+=(const char* other) { m_path += other; return *this; }
 
     QString toQString() const;
     std::string toStdString() const;
@@ -54,7 +61,10 @@ private:
     QByteArray m_path;
 };
 
-inline mu::log::Stream& operator<<(mu::log::Stream& s, const mu::io::path& p)
+inline path operator+(const char* one, const path& other) { return path(one) + other; }
+inline path operator+(const QString& one, const path& other) { return path(one) + other; }
+
+inline mu::logger::Stream& operator<<(mu::logger::Stream& s, const mu::io::path& p)
 {
     s << p.c_str();
     return s;
@@ -63,11 +73,14 @@ inline mu::log::Stream& operator<<(mu::log::Stream& s, const mu::io::path& p)
 std::string syffix(const path& path);
 path filename(const path& path);
 path basename(const path& path);
+path completebasename(const path& path);
 path dirname(const path& path);
 path dirpath(const path& path);
 
+bool isAllowedFileName(const path& fn);
 path escapeFileName(const path& fn);
-}
+
+paths pathsFromStrings(const QStringList& list);
 }
 
 #endif // MU_IO_PATH_H

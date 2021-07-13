@@ -1,32 +1,48 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
-#ifndef MU_FRAMEWORK_ICONCODE_H
-#define MU_FRAMEWORK_ICONCODE_H
+#ifndef MU_UI_ICONCODE_H
+#define MU_UI_ICONCODE_H
 
 #include <QObject>
+
+#ifdef WARNING
+#undef WARNING
+#endif
+#ifdef INFO
+#undef INFO
+#endif
+#ifdef ERROR
+#undef ERROR
+#endif
+#ifdef QUESTION
+#undef QUESTION
+#endif
 
 #ifdef FILE_OPEN
 #undef FILE_OPEN
 #endif
 
-namespace mu::framework {
+namespace mu::ui {
 /**
  * @brief The IconCode class simplifies access to the icons from the icon font
  *
@@ -63,7 +79,6 @@ public:
         OPEN_FILE = 0xEF23,
         SHARE_FILE = 0xEF24,
         CLOUD_FILE = 0xEF25,
-        PAGE = 0xF3A5,
         REWIND = 0xEF26,
         MIXER = 0xEF27,
         CONFIGURE = 0xEF28,
@@ -167,6 +182,7 @@ public:
         RIGHT_MARGIN = 0xEF95,
         BOTTOM_MARGIN = 0xEF96,
         TOP_MARGIN = 0xEF97,
+        MIDI_INPUT = 0xEF98,
         ACCOUNT = 0xEF99,
 
         STAR = 0xEF9A,
@@ -178,11 +194,22 @@ public:
 
         GRADUATION_CAP = 0xF19D,
 
+        SCORE = 0xF319,
+
+        AUTO_TEXT = 0xF329,
+        NOTE_HEAD_EIGHTH = 0xF33A,
+        BEAM_START = 0xF33B,
+        BEAM_MIDDLE = 0xF33D,
+        BEAM_32 = 0xF33E,
+        BEAM_64 = 0xF33F,
+
         QUESTION_MARK = 0xF340,
+
         NOTE_HEAD_QUARTER = 0xF341,
         NOTE_HEAD_HALF = 0xF342,
         NOTE_HEAD_WHOLE = 0xF343,
         NOTE_HEAD_BREVIS = 0xF344,
+        PLAY_REPEATS = 0xF345,
         BARLINE_WINGED = 0xF34C,
         BARLINE_UNWINGED = 0xF34D,
         ORIENTATION_PORTRAIT = 0xF350,
@@ -191,7 +218,11 @@ public:
         CHORD_SYMBOL = 0xF352,
         GUITAR_BEND = 0xF353,
         MULTIMEASURE_REST = 0xF355,
+        IMPORT = 0xF357,
+        UPDATE = 0xF358,
+        OPEN_LINK = 0xF359,
         GUITAR_TREMOLO_BAR = 0xF35C,
+        SHORTCUTS = 0xF35D,
 
         TREMOLO_TWO_NOTES = 0xF35F,
         TREMOLO_STYLE_DEFAULT = 0xF35F,
@@ -206,7 +237,7 @@ public:
         NOTE_QUARTER = 0xF368,
         NOTE_8TH = 0xF369,
         NOTE_16TH = 0xF36A,
-        NOTE_32TH = 0xF36B,
+        NOTE_32ND = 0xF36B,
         NOTE_64TH = 0xF36C,
         NOTE_128TH = 0xF36D,
         NOTE_256TH = 0xF36E,
@@ -253,11 +284,35 @@ public:
         NOTE_DOTTED_3 = 0xF396,
         NOTE_DOTTED_4 = 0xF397,
 
+        COPY = 0xF398,
+
         NOTE_PLUS = 0xF39D,
         NOTE_TO_RIGHT = 0xF39E,
         RHYTHM_ONLY = 0xF39F,
         RE_PITH = 0xF3A0,
         FOOT_PEDAL = 0xF3A1,
+
+        TOOLBAR_GRIP = 0xF3A2,
+
+        PAGE = 0xF3A5,
+
+        CAMERA = 0xF3AE,
+
+        CONTINUOUS_VIEW_VERTICAL = 0xF3AF,
+
+        PAN_SCORE = 0xF3B0,
+        COUNT_IN = 0xF3B1,
+
+        PRINT = 0xF3B7,
+
+        LOOP_IN = 0xF3C7,
+        LOOP_OUT = 0xF3C8,
+        PAUSE = 0xF3C9,
+
+        WARNING = 0xF3CE,
+        INFO = 0xF3CF,
+        ERROR = 0xF3D0,
+        QUESTION = 0xF3D1,
 
         AUTO,
         NONE,
@@ -273,4 +328,4 @@ static inline QChar iconCodeToChar(IconCode::Code code)
 }
 }
 
-#endif // MU_FRAMEWORK_ICONCODE_H
+#endif // MU_UI_ICONCODE_H

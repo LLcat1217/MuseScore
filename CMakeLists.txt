@@ -1,21 +1,22 @@
-#=============================================================================
-#  MuseScore
-#  Linux Music Score Editor
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2002-2016 by Werner Schweer and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.16)
 
@@ -54,6 +55,27 @@ option(BUILD_TELEMETRY_MODULE "Build with telemetry module" ON)
 set(TELEMETRY_TRACK_ID "" CACHE STRING "Telemetry track id")
 set(CRASH_REPORT_URL "" CACHE STRING "URL where to send crash reports")
 
+option(BUILD_SHORTCUTS_MODULE "Build shortcuts module" ON)
+option(BUILD_SYSTEM_MODULE "Build system module" ON)
+option(BUILD_NETWORK_MODULE "Build network module" ON)
+option(BUILD_AUDIO_MODULE "Build audio module" ON)
+option(BUILD_USERSCORES_MODULE "Build userscores module" ON)
+option(BUILD_LEARN_MODULE "Build learn module" ON)
+option(BUILD_WORKSPACE_MODULE "Build workspace module" ON)
+option(BUILD_CLOUD_MODULE "Build cloud module" ON)
+option(BUILD_EXTENSIONS_MODULE "Build extensions module" ON)
+option(BUILD_LANGUAGES_MODULE "Build languages module" ON)
+option(BUILD_PLUGINS_MODULE "Build plugins module" ON)
+option(BUILD_PLAYBACK_MODULE "Build playback module" ON)
+option(BUILD_PALETTE_MODULE "Build palette module" ON)
+option(BUILD_INSTRUMENTS_MODULE "Build instruments module" ON)
+option(BUILD_INSPECTOR_MODULE "Build inspector module" ON)
+option(BUILD_AUTOBOT_MODULE "Build autobot module" OFF)
+option(BUILD_MULTIINSTANCES_MODULE "Build multiinstances module" ON)
+set(YOUTUBE_API_KEY "" CACHE STRING "YouTube API key")
+
+option(USE_SCORE_ACCESSIBLE_TREE "Use score accessible tree" OFF)
+
 option(SOUNDFONT3    "Ogg Vorbis compressed fonts"        ON)  # Enable Ogg Vorbis compressed fonts, requires Ogg & Vorbis
 option(DOWNLOAD_SOUNDFONT "Download the latest soundfont version as part of the build process" ON)
 
@@ -65,9 +87,9 @@ option(BUILD_PCH "Build using precompiled headers." ON)
 option(BUILD_UNITY "Build using unity build." ON)
 option(TRY_BUILD_SHARED_LIBS_IN_DEBUG "Build shared libs if possible in debug" OFF)
 option(QML_LOAD_FROM_SOURCE "Load qml files from source (not resource)" OFF)
+option(TRACE_DRAW_OBJ_ENABLED "Trace draw objects" OFF)
 
 option(USE_SYSTEM_FREETYPE "Use system FreeType" OFF) # requires freetype >= 2.5.2, does not work on win
-option(BUILD_WEBENGINE "Built in webengine support" ON)
 set(SCRIPT_INTERFACE  TRUE)
 
 set(VST3_SDK_VERSION "3.7")
@@ -85,6 +107,13 @@ endif (BUILD_PORTABLEAPPS)
 if (BUILD_FOR_WINSTORE)
     set(FOR_WINSTORE 1)
 endif(BUILD_FOR_WINSTORE)
+
+set(APP_UPDATABLE 1)
+if (OS_IS_MAC OR OS_IS_WIN)
+    if (WIN_PORTABLE OR FOR_WINSTORE)
+        set(APP_UPDATABLE 0)
+    endif(WIN_PORTABLE OR FOR_WINSTORE)
+endif(OS_IS_MAC OR OS_IS_WIN)
 
 ###########################################
 # Setup compiler and build environment
@@ -110,17 +139,6 @@ configure_file (
 ###########################################
 # Setup external dependencies
 ###########################################
-
-# We need this early, before FindQt5
-if (BUILD_WEBENGINE)
-   if (CC_IS_MINGW)
-      set(USE_WEBENGINE 0)
-   else (CC_IS_MINGW)
-      set(USE_WEBENGINE 1)
-   endif(CC_IS_MINGW)
-else (BUILD_WEBENGINE)
-   set(USE_WEBENGINE 0)
-endif (BUILD_WEBENGINE)
 
 set(QT_MIN_VERSION    "5.15.0")
 include(FindQt5)
@@ -197,6 +215,17 @@ add_subdirectory(share)
 add_subdirectory(src/framework/global) # should be first to work pch
 add_subdirectory(thirdparty/qzip)
 add_subdirectory(src)
+
+###########################################
+# Setup the KDDockWidgets lib
+###########################################
+if (NOT BUILD_SHARED_LIBS)
+    set(KDDockWidgets_STATIC ON CACHE BOOL "Build static versions of the libraries" FORCE)
+endif(NOT BUILD_SHARED_LIBS)
+
+set(KDDockWidgets_QTQUICK ON CACHE BOOL "Build for QtQuick instead of QtWidgets" FORCE)
+set(KDDockWidgets_EXAMPLES OFF CACHE BOOL "Build the examples" FORCE)
+add_subdirectory(thirdparty/KDDockWidgets)
 
 ###########################################
 # Setup Packaging

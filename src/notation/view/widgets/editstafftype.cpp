@@ -1,14 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2010-2014 Werner Schweer and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENCE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "editstafftype.h"
 #include "libmscore/part.h"
@@ -17,11 +27,14 @@
 #include "libmscore/staff.h"
 #include "libmscore/stringdata.h"
 
+#include "engraving/scoreaccess.h"
+
 #include "widgetstatestore.h"
 #include "internal/mscznotationreader.h"
 
-#include "log.h"
 #include "notationerrors.h"
+
+#include "log.h"
 
 using namespace mu::notation;
 
@@ -75,7 +88,7 @@ EditStaffType::EditStaffType(QWidget* parent)
     }
 
     // load a sample standard score in preview
-    Ms::MasterScore* sc = new Ms::MasterScore(Ms::MScore::defaultStyle());
+    Ms::MasterScore* sc = mu::engraving::ScoreAccess::createMasterScore(Ms::MScore::defaultStyle());
     if (loadScore(sc, ":/view/resources/data/std_sample.mscx")) {
         standardPreview->setScore(sc);
     } else {
@@ -83,7 +96,7 @@ EditStaffType::EditStaffType(QWidget* parent)
     }
 
     // load a sample tabulature score in preview
-    sc = new Ms::MasterScore(Ms::MScore::defaultStyle());
+    sc = mu::engraving::ScoreAccess::createMasterScore(Ms::MScore::defaultStyle());
     if (loadScore(sc, ":/view/resources/data/tab_sample.mscx")) {
         tabPreview->setScore(sc);
     } else {
@@ -148,7 +161,7 @@ void EditStaffType::setStaffType(const Ms::StaffType* stafftype)
     setValues();
 }
 
-void EditStaffType::setInstrument(const instruments::Instrument instrument)
+void EditStaffType::setInstrument(const Instrument& instrument)
 {
     // template combo
 
@@ -208,8 +221,7 @@ mu::Ret EditStaffType::doLoadScore(Ms::MasterScore* score, const mu::io::path& p
     score->update();
 
     if (!score->sanityCheck(QString())) {
-        LOGE() << "Failed load score";
-        return make_ret(Err::FileCorrupted);
+        return make_ret(Err::FileCorrupted, path);
     }
 
     return make_ret(Ret::Code::Ok);
@@ -604,7 +616,7 @@ void EditStaffType::updatePreview()
         preview = standardPreview;
     }
     if (preview) {
-        preview->score()->staff(0)->setStaffType(Ms::Fraction(0,1), staffType);
+        preview->score()->staff(0)->setStaffType(Ms::Fraction(0, 1), staffType);
         preview->score()->doLayout();
         preview->updateAll();
         preview->update();

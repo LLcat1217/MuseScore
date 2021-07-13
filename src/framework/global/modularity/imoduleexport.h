@@ -1,24 +1,27 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
-#ifndef MU_FRAMEWORK_IMODULEEXPORT_H
-#define MU_FRAMEWORK_IMODULEEXPORT_H
+#ifndef MU_MODULARITY_IMODULEEXPORT_H
+#define MU_MODULARITY_IMODULEEXPORT_H
 
 #include <memory>
 
@@ -29,8 +32,7 @@ public:                                 \
         return id;                      \
     }                                   \
 
-namespace mu {
-namespace framework {
+namespace mu::modularity {
 class IModuleExportInterface
 {
 public:
@@ -42,9 +44,8 @@ struct IModuleExportCreator {
     virtual std::shared_ptr<IModuleExportInterface> create() = 0;
 };
 }
-}
 
-#define MODULE_EXPORT_INTERFACE public mu::framework::IModuleExportInterface
-#define MODULE_EXPORT_CREATOR public mu::framework::IModuleExportCreator
+#define MODULE_EXPORT_INTERFACE public mu::modularity::IModuleExportInterface
+#define MODULE_EXPORT_CREATOR public mu::modularity::IModuleExportCreator
 
-#endif // MU_FRAMEWORK_IMODULEEXPORT_H
+#endif // MU_MODULARITY_IMODULEEXPORT_H

@@ -1,89 +1,96 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "globalcontext.h"
+
+#include "notation/imasternotation.h"
 
 using namespace mu::context;
 using namespace mu::notation;
-using namespace mu::shortcuts;
 using namespace mu::async;
 
-static const mu::Uri NOTATION_PAGE_URI("musescore://notation");
-
-void GlobalContext::addMasterNotation(const IMasterNotationPtr& notation)
+void GlobalContext::addNotationProject(const INotationProjectPtr& project)
 {
-    m_masterNotations.push_back(notation);
+    m_projects.push_back(project);
 }
 
-void GlobalContext::removeMasterNotation(const IMasterNotationPtr& notation)
+void GlobalContext::removeNotationProject(const INotationProjectPtr& project)
 {
-    m_masterNotations.erase(std::remove(m_masterNotations.begin(), m_masterNotations.end(), notation), m_masterNotations.end());
+    m_projects.erase(std::remove(m_projects.begin(), m_projects.end(), project), m_projects.end());
 }
 
-const std::vector<IMasterNotationPtr>& GlobalContext::masterNotations() const
+const std::vector<INotationProjectPtr>& GlobalContext::notationProjects() const
 {
-    return m_masterNotations;
+    return m_projects;
 }
 
-bool GlobalContext::containsMasterNotation(const io::path& path) const
+bool GlobalContext::containsNotationProject(const io::path& path) const
 {
-    for (const auto& n : m_masterNotations) {
-        if (n->path() == path) {
+    for (const auto& p : m_projects) {
+        if (p->path() == path) {
             return true;
         }
     }
     return false;
 }
 
-void GlobalContext::setCurrentMasterNotation(const IMasterNotationPtr& notation)
+void GlobalContext::setCurrentNotationProject(const INotationProjectPtr& project)
 {
-    if (m_currentMasterNotation == notation) {
+    if (m_currentNotationProject == project) {
         return;
     }
 
-    m_currentMasterNotation = notation;
-    m_currentMasterNotationChanged.notify();
+    m_currentNotationProject = project;
 
-    setCurrentNotation(notation);
+    INotationPtr notation = project ? project->masterNotation()->notation() : nullptr;
+    doSetCurrentNotation(notation);
+
+    m_currentNotationProjectChanged.notify();
+    m_currentNotationChanged.notify();
+}
+
+INotationProjectPtr GlobalContext::currentNotationProject() const
+{
+    return m_currentNotationProject;
+}
+
+Notification GlobalContext::currentNotationProjectChanged() const
+{
+    return m_currentNotationProjectChanged;
 }
 
 IMasterNotationPtr GlobalContext::currentMasterNotation() const
 {
-    return m_currentMasterNotation;
+    return m_currentNotationProject ? m_currentNotationProject->masterNotation() : nullptr;
 }
 
 Notification GlobalContext::currentMasterNotationChanged() const
 {
-    return m_currentMasterNotationChanged;
+    //! NOTE Same as project
+    return m_currentNotationProjectChanged;
 }
 
 void GlobalContext::setCurrentNotation(const INotationPtr& notation)
 {
-    if (m_currentNotation == notation) {
-        return;
-    }
-
-    m_currentNotation = notation;
-
-    if (m_currentNotation) {
-        m_currentNotation->setOpened(true);
-    }
-
+    doSetCurrentNotation(notation);
     m_currentNotationChanged.notify();
 }
 
@@ -97,12 +104,15 @@ Notification GlobalContext::currentNotationChanged() const
     return m_currentNotationChanged;
 }
 
-ShortcutContext GlobalContext::currentShortcutContext() const
+void GlobalContext::doSetCurrentNotation(const INotationPtr& notation)
 {
-    if (playbackController()->isPlaying()) {
-        return ShortcutContext::Playing;
-    } else if (interactive()->currentUri().val == NOTATION_PAGE_URI) {
-        return ShortcutContext::NotationActive;
+    if (m_currentNotation == notation) {
+        return;
     }
-    return ShortcutContext::Undefined;
+
+    m_currentNotation = notation;
+
+    if (m_currentNotation) {
+        m_currentNotation->setOpened(true);
+    }
 }

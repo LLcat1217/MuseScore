@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_NOTATION_NOTEINPUTBARCUSOMISEMODEL_H
 #define MU_NOTATION_NOTEINPUTBARCUSOMISEMODEL_H
 
@@ -23,26 +26,24 @@
 
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
-#include "inotationconfiguration.h"
-#include "workspace/iworkspacemanager.h"
-#include "actions/iactionsregister.h"
+#include "ui/iuiconfiguration.h"
+#include "ui/iuiactionsregister.h"
+
+#include "noteinputbarcustomiseitem.h"
 
 class QItemSelectionModel;
 
-namespace mu::framework {
+namespace mu::uicomponents {
 class ItemMultiSelectionModel;
 }
 
 namespace mu::notation {
-class AbstractNoteInputBarItem;
-class ActionNoteInputBarItem;
 class NoteInputBarCustomiseModel : public QAbstractListModel, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(notation, INotationConfiguration, configuration)
-    INJECT(notation, workspace::IWorkspaceManager, workspaceManager)
-    INJECT(notation, actions::IActionsRegister, actionsRegister)
+    INJECT(notation, ui::IUiConfiguration, uiConfiguration)
+    INJECT(notation, ui::IUiActionsRegister, actionsRegister)
 
     Q_PROPERTY(QItemSelectionModel * selectionModel READ selectionModel NOTIFY selectionChanged)
     Q_PROPERTY(bool isMovingUpAvailable READ isMovingUpAvailable NOTIFY isMovingUpAvailableChanged)
@@ -87,7 +88,7 @@ private:
         SelectedRole
     };
 
-    AbstractNoteInputBarItem* modelIndexToItem(const QModelIndex& index) const;
+    NoteInputBarCustomiseItem* modelIndexToItem(const QModelIndex& index) const;
 
     void setIsMovingUpAvailable(bool isMovingUpAvailable);
     void setIsMovingDownAvailable(bool isMovingDownAvailable);
@@ -101,21 +102,13 @@ private:
     void updateRemovingAvailability();
     void updateAddSeparatorAvailability();
 
-    AbstractNoteInputBarItem* makeItem(const actions::Action& action, bool checked);
-    AbstractNoteInputBarItem* makeSeparatorItem() const;
-
-    actions::ActionNameList customizedActions() const;
-    actions::ActionNameList defaultActions() const;
-    actions::ActionNameList currentActions() const;
-
-    actions::ActionNameList currentWorkspaceActions() const;
-
-    bool actionFromNoteInputModes(const actions::ActionName& actionName) const;
+    NoteInputBarCustomiseItem* makeItem(const ui::UiAction& action, bool checked);
+    NoteInputBarCustomiseItem* makeSeparatorItem();
 
     void saveActions();
 
-    QList<AbstractNoteInputBarItem*> m_actions;
-    framework::ItemMultiSelectionModel* m_selectionModel = nullptr;
+    QList<NoteInputBarCustomiseItem*> m_items;
+    uicomponents::ItemMultiSelectionModel* m_selectionModel = nullptr;
 
     bool m_isMovingUpAvailable = false;
     bool m_isMovingDownAvailable = false;

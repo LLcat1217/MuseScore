@@ -1,23 +1,26 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
-#ifndef MU_FRAMEWORK_NETWORKMANAGER_H
-#define MU_FRAMEWORK_NETWORKMANAGER_H
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+#ifndef MU_NETWORK_NETWORKMANAGER_H
+#define MU_NETWORK_NETWORKMANAGER_H
 
 #include "inetworkmanager.h"
 
@@ -25,7 +28,7 @@ class QNetworkAccessManager;
 class QNetworkRequest;
 class QNetworkReply;
 
-namespace mu::framework {
+namespace mu::network {
 class NetworkManager : public QObject, public INetworkManager
 {
     Q_OBJECT
@@ -34,13 +37,15 @@ public:
     explicit NetworkManager(QObject* parent = nullptr);
     ~NetworkManager() override;
 
-    Ret get(const QUrl& url, IODevice* incommingData) override;
-    Ret head(const QUrl& url) override;
-    Ret post(const QUrl& url, IODevice* outgoingData, IODevice* incommingData) override;
-    Ret put(const QUrl& url, IODevice* outgoingData, IODevice* incommingData) override;
-    Ret del(const QUrl& url, IODevice* incommingData) override;
+    Ret get(const QUrl& url, IncomingDevice* incommingData, const RequestHeaders& headers = RequestHeaders()) override;
+    Ret head(const QUrl& url, const RequestHeaders& headers = RequestHeaders()) override;
+    Ret post(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incommingData,
+             const RequestHeaders& headers = RequestHeaders()) override;
+    Ret put(const QUrl& url, OutgoingDevice* outgoingData, IncomingDevice* incommingData,
+            const RequestHeaders& headers = RequestHeaders()) override;
+    Ret del(const QUrl& url, IncomingDevice* incommingData, const RequestHeaders& headers = RequestHeaders()) override;
 
-    ProgressChannel progressChannel() const override;
+    framework::ProgressChannel progressChannel() const override;
 
     void abort() override;
 
@@ -56,15 +61,17 @@ private:
         DELETE_REQUEST
     };
 
-    Ret execRequest(RequestType requestType, const QUrl& url, IODevice* incommingData = nullptr, IODevice* outgoingData = nullptr);
-    QNetworkReply* receiveReply(RequestType requestType, const QNetworkRequest& request, IODevice* outgoingData = nullptr);
+    Ret execRequest(RequestType requestType, const QUrl& url, IncomingDevice* incommingData = nullptr,
+                    OutgoingDevice* outgoingData = nullptr, const RequestHeaders& headers = RequestHeaders());
 
-    bool openIoDevice(IODevice* device, QIODevice::OpenModeFlag flags);
-    void closeIoDevice(IODevice* device);
+    QNetworkReply* receiveReply(RequestType requestType, const QNetworkRequest& request, OutgoingDevice* outgoingData = nullptr);
+
+    bool openDevice(io::Device* device, QIODevice::OpenModeFlag flags);
+    void closeDevice(io::Device* device);
 
     bool isAborted() const;
 
-    void prepareReplyReceive(QNetworkReply* reply, IODevice* incommingData);
+    void prepareReplyReceive(QNetworkReply* reply, IncomingDevice* incommingData);
     void prepareReplyTransmit(QNetworkReply* reply);
 
     Ret waitForReplyFinished(QNetworkReply* reply, int timeoutMs);
@@ -72,12 +79,12 @@ private:
 
 private:
     QNetworkAccessManager* m_manager = nullptr;
-    IODevice* m_incommingData = nullptr;
+    IncomingDevice* m_incommingData = nullptr;
     QNetworkReply* m_reply = nullptr;
-    ProgressChannel m_progressCh;
+    framework::ProgressChannel m_progressCh;
 
     bool m_isAborted = false;
 };
 }
 
-#endif // MU_FRAMEWORK_NETWORKMANAGER_H
+#endif // MU_NETWORK_NETWORKMANAGER_H

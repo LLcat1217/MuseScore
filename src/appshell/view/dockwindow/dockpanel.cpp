@@ -1,134 +1,92 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "dockpanel.h"
 
-#include <QDockWidget>
+#include "thirdparty/KDDockWidgets/src/DockWidgetQuick.h"
+
+#include "log.h"
 
 using namespace mu::dock;
-
-static const QString PANEL_QSS = QString("QDockWidget { border: 1; color: white; }"
-                                         "QDockWidget::title { background: %1; } ");
+using namespace mu::uicomponents;
 
 DockPanel::DockPanel(QQuickItem* parent)
-    : DockView(parent)
+    : DockBase(parent)
 {
-    m_dock.panel = new QDockWidget();
+    setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 }
 
 DockPanel::~DockPanel()
 {
-    delete m_dock.panel;
-}
-
-void DockPanel::onComponentCompleted()
-{
-    panel()->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    panel()->setFeatures(QDockWidget::DockWidgetMovable);
-    panel()->setObjectName("w_" + objectName());
-    panel()->setWidget(view());
-    panel()->setWindowTitle(m_title);
-    panel()->setStyleSheet(PANEL_QSS.arg(color().name()));
-
-    m_preferedWidth = width();
-
-    if (minimumWidth() == 0) {
-        panel()->setMinimumWidth(width());
-    }
-}
-
-void DockPanel::updateStyle()
-{
-    panel()->setStyleSheet(PANEL_QSS.arg(color().name()));
-}
-
-DockPanel::Widget DockPanel::widget() const
-{
-    return m_dock;
-}
-
-QString DockPanel::title() const
-{
-    return m_title;
-}
-
-void DockPanel::setTitle(QString title)
-{
-    if (m_title == title) {
+    KDDockWidgets::DockWidgetQuick* w = dockWidget();
+    IF_ASSERT_FAILED(w) {
         return;
     }
 
-    m_title = title;
-    emit titleChanged(m_title);
+    w->setProperty("dockPanel", QVariant::fromValue(nullptr));
 }
 
-Qt::DockWidgetArea DockPanel::area() const
+DockPanel* DockPanel::tabifyPanel() const
 {
-    return m_dock.area;
+    return m_tabifyPanel;
 }
 
-void DockPanel::setArea(Qt::DockWidgetArea area)
+void DockPanel::setTabifyPanel(DockPanel* panel)
 {
-    if (m_dock.area == area) {
+    if (panel == m_tabifyPanel) {
         return;
     }
 
-    m_dock.area = area;
-    emit areaChanged(m_dock.area);
+    m_tabifyPanel = panel;
+    emit tabifyPanelChanged(panel);
 }
 
-QString DockPanel::tabifyObjectName() const
+DockType DockPanel::type() const
 {
-    return m_dock.tabifyObjectName;
+    return DockType::Panel;
 }
 
-void DockPanel::setTabifyObjectName(QString tabify)
+void DockPanel::componentComplete()
 {
-    if (m_dock.tabifyObjectName == tabify) {
+    DockBase::componentComplete();
+
+    KDDockWidgets::DockWidgetQuick* w = dockWidget();
+    IF_ASSERT_FAILED(w) {
         return;
     }
 
-    m_dock.tabifyObjectName = tabify;
-    emit tabifyObjectNameChanged(m_dock.tabifyObjectName);
+    w->setProperty("dockPanel", QVariant::fromValue(this));
 }
 
-int DockPanel::minimumWidth() const
+QObject* DockPanel::navigationSection() const
 {
-    return panel()->minimumWidth();
+    return m_navigationSection;
 }
 
-int DockPanel::preferedWidth() const
+void DockPanel::setNavigationSection(QObject* newNavigation)
 {
-    return m_preferedWidth;
-}
-
-void DockPanel::setMinimumWidth(int width)
-{
-    if (panel()->minimumWidth() == width) {
+    if (m_navigationSection == newNavigation) {
         return;
     }
-
-    panel()->setMinimumWidth(width);
-    emit minimumWidthChanged(width);
-}
-
-QDockWidget* DockPanel::panel() const
-{
-    return m_dock.panel;
+    m_navigationSection = newNavigation;
+    emit navigationSectionChanged();
 }

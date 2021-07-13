@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2010-2019 Werner Schweer and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "gridcanvas.h"
 
@@ -23,9 +26,10 @@
 #include <QPalette>
 #include <cmath>
 
-using namespace Ms;
+#include "draw/pen.h"
 
-using namespace mu::framework;
+using namespace mu::inspector;
+using namespace mu::ui;
 
 GridCanvas::GridCanvas(QQuickItem* parent)
     : QQuickPaintedItem(parent)
@@ -115,7 +119,7 @@ void GridCanvas::setShouldShowNegativeRows(bool shouldShowNegativeRows)
 
 void GridCanvas::setPointList(QVariant pointList)
 {
-    QList<PitchValue> newPointList = pointList.value<QList<PitchValue> >();
+    QList<Ms::PitchValue> newPointList = pointList.value<QList<Ms::PitchValue> >();
 
     if (m_points == newPointList) {
         return;
@@ -159,7 +163,7 @@ void GridCanvas::paint(QPainter* painter)
     QPen pen = painter->pen();
     pen.setWidth(1);
 
-    QColor primaryLinesColor(uiConfig()->actualThemeType() == IUiConfiguration::ThemeType::DARK_THEME ? Qt::white : Qt::black);
+    QColor primaryLinesColor(uiConfig()->currentTheme().codeKey == DARK_THEME_CODE ? Qt::white : Qt::black);
     QColor secondaryLinesColor(Qt::gray);
     // draw vertical lines
     for (int i = 0; i < m_columns; ++i) {
@@ -183,7 +187,7 @@ void GridCanvas::paint(QPainter* painter)
     }
 
     // this lambda takes as input a pitch value, and determines where what are its x and y coordinates
-    auto getPosition = [this, columnWidth, rowHeight, leftPos, topPos, bottomPos](const PitchValue& v) -> QPointF {
+    auto getPosition = [this, columnWidth, rowHeight, leftPos, topPos, bottomPos](const Ms::PitchValue& v) -> QPointF {
         const qreal x = round((qreal(v.time) / 60) * (m_columns - 1)) * columnWidth + leftPos;
         qreal y = 0;
         if (m_showNegativeRows) {                    // get the middle pos and add the top margin and half of the rows
@@ -204,7 +208,7 @@ void GridCanvas::paint(QPainter* painter)
     pen.setColor(Qt::red);   // not theme dependant
     painter->setPen(pen);
     // draw line between points
-    for (const PitchValue& v : m_points) {
+    for (const Ms::PitchValue& v : m_points) {
         QPointF currentPoint = getPosition(v);
         // draw line only if there is a point before the current one
         if (lastPoint.x()) {
@@ -216,7 +220,7 @@ void GridCanvas::paint(QPainter* painter)
     painter->setPen(Qt::NoPen);
     painter->setBrush(QColor::fromRgb(32, 116, 189));   // Musescore blue
     // draw points
-    for (const PitchValue& v : m_points) {
+    for (const Ms::PitchValue& v : m_points) {
         painter->drawEllipse(getPosition(v), GRIP_HALF_RADIUS, GRIP_HALF_RADIUS);
     }
 }
@@ -268,7 +272,7 @@ void GridCanvas::mousePressEvent(QMouseEvent* ev)
     bool found = false;
     for (int i = 0; i < numberOfPoints; ++i) {
         if (round(qreal(m_points[i].time) / 60 * (m_columns - 1)) > column) {
-            m_points.insert(i, PitchValue(time, pitch, false));
+            m_points.insert(i, Ms::PitchValue(time, pitch, false));
             found = true;
             break;
         }
@@ -284,7 +288,7 @@ void GridCanvas::mousePressEvent(QMouseEvent* ev)
         }
     }
     if (!found) {
-        m_points.append(PitchValue(time, pitch, false));
+        m_points.append(Ms::PitchValue(time, pitch, false));
     }
 
     update();

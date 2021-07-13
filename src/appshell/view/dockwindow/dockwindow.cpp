@@ -1,332 +1,153 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "dockwindow.h"
 
-#include <QDebug>
-#include <QApplication>
-#include <QMainWindow>
-#include <QToolBar>
-#include <QStackedWidget>
-#include <QDockWidget>
-#include <QStatusBar>
+#include "thirdparty/KDDockWidgets/src/private/quick/MainWindowQuick_p.h"
+#include "thirdparty/KDDockWidgets/src/DockWidgetQuick.h"
+#include "thirdparty/KDDockWidgets/src/LayoutSaver.h"
 
 #include "log.h"
-#include "eventswatcher.h"
-#include "modularity/ioc.h"
 
-#include "framework/global/widgetstatestore.h"
+#include "dockpage.h"
+#include "docktoolbar.h"
+#include "docktoolbarholder.h"
+#include "dockcentral.h"
+#include "dockpanel.h"
+#include "dockpanelholder.h"
 
 using namespace mu::dock;
 
-static const QString WINDOW_QSS = QString("QMainWindow { background: %1; } "
-                                          "QMainWindow::separator { background: %1; width: 4px; } "
-                                          "QTabBar::tab { background: %1; border: 2px solid; padding: 2px; }"
-                                          "QTabBar::tab:selected { border-color: #9B9B9B; border-bottom-color: #C2C7CB; }");
-
-static const QString STATUS_QSS = QString("QStatusBar { background: %1; } QStatusBar::item { border: 0 }");
+static constexpr double MAX_DISTANCE_TO_HOLDER = 25;
 
 DockWindow::DockWindow(QQuickItem* parent)
-    : QQuickItem(parent), m_toolbars(this), m_pages(this)
+    : QQuickItem(parent),
+    m_toolBars(this),
+    m_pages(this)
 {
-    framework::ioc()->registerExportNoDelete<framework::IMainWindow>("dock", this);
-
-    setFlag(QQuickItem::ItemHasContents, true);
-    m_window = new QMainWindow();
-    m_window->setObjectName("mainWindow");
-    m_window->setMinimumSize(800, 600);
-    setWidth(1024);
-    setHeight(800);
-
-    m_eventsWatcher = new EventsWatcher(this);
-    m_window->installEventFilter(m_eventsWatcher);
-    connect(m_eventsWatcher, &EventsWatcher::eventReceived, this, &DockWindow::onMainWindowEvent);
-
-    m_central = new QStackedWidget(m_window);
-    m_window->setCentralWidget(m_central);
-
-    m_window->setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::West);
-    m_window->setTabPosition(Qt::RightDockWidgetArea, QTabWidget::East);
-    m_window->setAnimated(false);
-
-    m_statusbar = new QStatusBar(m_window);
-    m_statusbar->setSizeGripEnabled(false);
-    m_window->setStatusBar(m_statusbar);
-
-    WidgetStateStore::restoreGeometry(m_window);
-
-    connect(m_pages.notifier(), &framework::QmlListPropertyNotifier::appended, this, &DockWindow::onPageAppended);
-    connect(this, &DockWindow::colorChanged, this, &DockWindow::updateStyle);
 }
 
 void DockWindow::componentComplete()
 {
+    TRACEFUNC;
+
     QQuickItem::componentComplete();
 
-    updateStyle();
+    m_mainWindow = new KDDockWidgets::MainWindowQuick("mainWindow",
+                                                      KDDockWidgets::MainWindowOption_None,
+                                                      this);
 
-    for (DockToolBar* t : m_toolbars.list()) {
-        DockToolBar::Widget tw = t->widget();
-        tw.bar->setParent(m_window);
-        m_window->addToolBar(tw.bar);
-    }
+    connect(qApp, &QCoreApplication::aboutToQuit, this, &DockWindow::onQuit);
 
-    togglePage(nullptr, currentPage());
-
-    m_window->show();
-
-    m_isComponentComplete = true;
-}
-
-void DockWindow::onMainWindowEvent(QEvent* e)
-{
-    if (QEvent::Resize == e->type()) {
-        QResizeEvent* re = static_cast<QResizeEvent*>(e);
-        setSize(QSizeF(re->size()));
-        adjustPanelsSize(currentPage());
-    } else if (QEvent::Close == e->type()) {
-        WidgetStateStore::saveGeometry(m_window);
-    }
-}
-
-void DockWindow::adjustPanelsSize(DockPage* page)
-{
-    if (!page) {
-        return;
-    }
-
-    constexpr int additionalSideSpace = 200; //! NOTE: experimental value
-    bool needMinimize = qMainWindow()->width() <= qMainWindow()->minimumWidth() + additionalSideSpace;
-
-    for (DockPanel* panel : page->panels()) {
-        if (needMinimize) {
-            qMainWindow()->resizeDocks({ panel->widget().panel }, { panel->minimumWidth() }, Qt::Horizontal);
-        } else {
-            qMainWindow()->resizeDocks({ panel->widget().panel }, { panel->preferedWidth() }, Qt::Horizontal);
+    configuration()->windowGeometryChanged().onNotify(this, [this]() {
+        if (m_quiting) {
+            return;
         }
-    }
-}
 
-void DockWindow::togglePage(DockPage* old, DockPage* current)
-{
-    if (old) {
-        hidePage(old);
-    }
+        resetWindowState();
+    });
 
-    if (current) {
-        showPage(current);
-    }
-}
+    mainWindow()->changeToolBarOrientationRequested().onReceive(this, [this](QString name, mu::framework::Orientation orientation) {
+        const DockPage* page = currentPage();
+        DockToolBar* toolBar = page ? dynamic_cast<DockToolBar*>(page->dockByName(name)) : nullptr;
 
-void DockWindow::hidePage(DockPage* page)
-{
-    page->setState(m_window->saveState());
-
-    QList<QWidget*> widgetsToHide;
-
-    DockCentral* central = page->central();
-    if (central) {
-        DockCentral::Widget cw = central->widget();
-        m_central->removeWidget(cw.widget);
-        widgetsToHide << cw.widget;
-    }
-
-    QList<DockPanel*> panels = page->panels();
-    for (DockPanel* panel : panels) {
-        DockPanel::Widget dw = panel->widget();
-        m_window->removeDockWidget(dw.panel);
-        widgetsToHide << dw.panel;
-    }
-
-    DockToolBar* tool = page->toolbar();
-    if (tool) {
-        DockToolBar::Widget tw = tool->widget();
-        m_window->removeToolBarBreak(tw.bar);
-        m_window->removeToolBar(tw.bar);
-        widgetsToHide << tw.bar;
-    }
-
-    DockStatusBar* status = page->statusbar();
-    if (status) {
-        DockStatusBar::Widget sw = status->widget();
-        m_statusbar->removeWidget(sw.widget);
-        widgetsToHide << sw.widget;
-    }
-
-    static QWidget* sDummy = new QWidget();
-    for (QWidget* w : widgetsToHide) {
-        w->hide();
-        w->setParent(sDummy);
-    }
-
-    m_window->update();
-    m_window->repaint();
-}
-
-void DockWindow::showPage(DockPage* page)
-{
-    QList<QWidget*> widgetsToShow;
-    QList<QWidget*> widgetsToHide;
-
-    // ToolBar
-    DockToolBar* tool = page->toolbar();
-    if (tool) {
-        DockToolBar::Widget tw = tool->widget();
-        if (tw.breakArea != Qt::NoToolBarArea) {
-            m_window->addToolBarBreak(tw.breakArea);
+        if (toolBar) {
+            toolBar->setOrientation(static_cast<Qt::Orientation>(orientation));
         }
-        m_window->addToolBar(tw.bar);
-        widgetsToShow << tw.bar;
-    }
+    });
 
-    // StatusBar
-    DockStatusBar* status = page->statusbar();
-    if (status) {
-        DockStatusBar::Widget sw = status->widget();
-        m_statusbar->setFixedHeight(sw.widget->height());
-        m_statusbar->addWidget(sw.widget, 1);
-        widgetsToShow << sw.widget << m_statusbar;
-    } else {
-        widgetsToHide << m_statusbar;
-    }
+    mainWindow()->hideAllDockingHoldersRequested().onNotify(this, [this]() {
+        hideCurrentToolBarDockingHolder();
+        hideCurrentPanelDockingHolder();
+    });
 
-    // Panels
-    QList<DockPanel*> panels = page->panels();
-    for (DockPanel* panel : panels) {
-        DockPanel::Widget dw = panel->widget();
-        m_window->addDockWidget(dw.area, dw.panel);
-        widgetsToShow << dw.panel;
-    }
+    mainWindow()->showToolBarDockingHolderRequested().onReceive(this, [this](const QPoint& mouseGlobalPos) {
+        QPoint localPos = m_mainWindow->mapFromGlobal(mouseGlobalPos);
+        QRect mainFrameGeometry = m_mainWindow->rect();
 
-    auto panelByName = [](const QList<DockPanel*> panels, const QString& objectName) -> DockPanel* {
-        for (DockPanel* panel : panels) {
-            if (panel->objectName() == objectName) {
-                return panel;
+        if (!mainFrameGeometry.contains(localPos)) {
+            return;
+        }
+
+        if (isMouseOverCurrentToolBarDockingHolder(localPos)) {
+            return;
+        }
+
+        DockToolBarHolder* holder = resolveToolbarDockingHolder(localPos);
+
+        if (holder != m_currentToolBarDockingHolder) {
+            hideCurrentToolBarDockingHolder();
+
+            if (holder) {
+                holder->show();
             }
         }
-        return nullptr;
-    };
 
-    for (DockPanel* panel : panels) {
-        DockPanel::Widget dw = panel->widget();
-        if (!dw.tabifyObjectName.isEmpty()) {
-            DockPanel* tp = panelByName(panels, dw.tabifyObjectName);
-            if (!tp) {
-                LOGE() << "unable tabify, not found panel with name: " << dw.tabifyObjectName;
-                continue;
+        m_currentToolBarDockingHolder = holder;
+    });
+
+    mainWindow()->showPanelDockingHolderRequested().onReceive(this, [this](const QPoint& mouseGlobalPos) {
+        QPoint localPos = m_mainWindow->mapFromGlobal(mouseGlobalPos);
+        QRect mainFrameGeometry = m_mainWindow->rect();
+
+        if (!mainFrameGeometry.contains(localPos)) {
+            return;
+        }
+
+        if (isMouseOverCurrentPanelDockingHolder(localPos)) {
+            return;
+        }
+
+        DockPanelHolder* holder = resolvePanelDockingHolder(localPos);
+
+        if (holder != m_currentPanelDockingHolder) {
+            hideCurrentPanelDockingHolder();
+
+            if (holder) {
+                qDebug() << holder->location();
+                holder->show();
             }
-            m_window->tabifyDockWidget(tp->widget().panel, dw.panel);
         }
-    }
 
-    // Central
-    DockCentral* central = page->central();
-    if (central) {
-        DockCentral::Widget cw = central->widget();
-        m_central->addWidget(cw.widget);
-        widgetsToShow << cw.widget;
-    }
+        m_currentPanelDockingHolder = holder;
+    });
 
-    QByteArray state = page->state();
-    if (!state.isEmpty()) {
-        m_window->restoreState(state);
-    }
-
-    for (QWidget* w : widgetsToShow) {
-        w->show();
-    }
-
-    for (QWidget* w : widgetsToHide) {
-        w->hide();
-    }
+    startupScenario()->run();
 }
 
-void DockWindow::updateStyle()
+void DockWindow::onQuit()
 {
-    m_window->setStyleSheet(WINDOW_QSS.arg(m_color.name()));
-    m_statusbar->setStyleSheet(STATUS_QSS.arg(m_color.name()));
-}
+    TRACEFUNC;
 
-DockPage* DockWindow::currentPage() const
-{
-    return page(m_currentPageUri);
-}
+    m_quiting = true;
 
-QString DockWindow::title() const
-{
-    return m_title;
-}
+    saveGeometry();
 
-void DockWindow::setTitle(QString title)
-{
-    if (m_title == title) {
+    const DockPage* currPage = currentPage();
+    IF_ASSERT_FAILED(currPage) {
         return;
     }
 
-    m_window->setWindowTitle(title);
-
-    m_title = title;
-    emit titleChanged(m_title);
-}
-
-QColor DockWindow::color() const
-{
-    return m_color;
-}
-
-void DockWindow::setColor(QColor color)
-{
-    if (m_color == color) {
-        return;
-    }
-
-    m_color = color;
-    emit colorChanged(m_color);
-}
-
-QQmlListProperty<DockToolBar> DockWindow::toolbars()
-{
-    return m_toolbars.property();
-}
-
-DockPage* DockWindow::page(const QString& uri) const
-{
-    for (int i = 0; i < m_pages.count(); ++i) {
-        if (m_pages.at(i)->uri() == uri) {
-            return m_pages.at(i);
-        }
-    }
-    return nullptr;
-}
-
-QQmlListProperty<DockPage> DockWindow::pages()
-{
-    return m_pages.property();
-}
-
-void DockWindow::onPageAppended(int index)
-{
-    DockPage* page = m_pages.at(index);
-    qInfo() << page->uri();
-    page->setParentItem(this);
-    page->setWidth(this->width());
-    page->setHeight(this->height());
+    savePageState(currPage->objectName());
 }
 
 QString DockWindow::currentPageUri() const
@@ -334,28 +155,455 @@ QString DockWindow::currentPageUri() const
     return m_currentPageUri;
 }
 
-void DockWindow::setCurrentPageUri(QString uri)
+QQmlListProperty<mu::dock::DockToolBar> DockWindow::toolBarsProperty()
 {
+    return m_toolBars.property();
+}
+
+QQmlListProperty<mu::dock::DockPage> DockWindow::pagesProperty()
+{
+    return m_pages.property();
+}
+
+void DockWindow::loadPage(const QString& uri)
+{
+    TRACEFUNC;
+
     if (m_currentPageUri == uri) {
         return;
     }
 
-    if (m_isComponentComplete) {
-        togglePage(page(m_currentPageUri), page(uri));
-        adjustPanelsSize(page(uri));
+    bool isFirstOpening = m_currentPageUri.isEmpty();
+    if (isFirstOpening) {
+        restoreGeometry();
+    }
+
+    DockPage* newPage = pageByUri(uri);
+    IF_ASSERT_FAILED(newPage) {
+        return;
+    }
+
+    DockPage* currentPage = this->currentPage();
+    if (currentPage) {
+        savePageState(currentPage->objectName());
+        currentPage->close();
+    }
+
+    loadPageContent(newPage);
+    restorePageState(newPage->objectName());
+    initDocks(newPage);
+
+    for (DockBase* dock : newPage->allDocks()) {
+        if (!dock->isVisible()) {
+            dock->hide();
+        }
     }
 
     m_currentPageUri = uri;
-
-    emit currentPageUriChanged(m_currentPageUri);
+    emit currentPageUriChanged(uri);
 }
 
-QMainWindow* DockWindow::qMainWindow()
+bool DockWindow::isDockShown(const QString& dockName) const
 {
-    return m_window;
+    const DockPage* currPage = currentPage();
+    return currPage ? currPage->isDockShown(dockName) : false;
 }
 
-void DockWindow::stackUnder(QWidget* w)
+void DockWindow::toggleDockVisibility(const QString& dockName)
 {
-    m_window->stackUnder(w);
+    DockPage* currPage = currentPage();
+    if (currPage) {
+        currPage->toggleDockVisibility(dockName);
+    }
+}
+
+DockToolBarHolder* DockWindow::mainToolBarDockingHolder() const
+{
+    return m_mainToolBarDockingHolder;
+}
+
+void DockWindow::setMainToolBarDockingHolder(DockToolBarHolder* mainToolBarDockingHolder)
+{
+    if (m_mainToolBarDockingHolder == mainToolBarDockingHolder) {
+        return;
+    }
+
+    m_mainToolBarDockingHolder = mainToolBarDockingHolder;
+    emit mainToolBarDockingHolderChanged(m_mainToolBarDockingHolder);
+}
+
+void DockWindow::loadPageContent(const DockPage* page)
+{
+    TRACEFUNC;
+
+    addDock(page->centralDock(), KDDockWidgets::Location_OnRight);
+
+    loadPagePanels(page);
+
+    loadPageToolbars(page);
+
+    if (page->statusBar()) {
+        addDock(page->statusBar(), KDDockWidgets::Location_OnBottom);
+    }
+
+    QList<DockToolBar*> allToolBars = m_toolBars.list();
+    allToolBars << page->mainToolBars();
+
+    DockToolBar* prevToolBar = nullptr;
+
+    for (DockToolBar* toolBar : allToolBars) {
+        auto location = prevToolBar ? KDDockWidgets::Location_OnRight : KDDockWidgets::Location_OnTop;
+        addDock(toolBar, location, prevToolBar);
+        prevToolBar = toolBar;
+    }
+
+    addDock(m_mainToolBarDockingHolder, KDDockWidgets::Location_OnTop);
+    m_mainToolBarDockingHolder->hide();
+
+    unitePanelsToTabs(page);
+}
+
+void DockWindow::unitePanelsToTabs(const DockPage* page)
+{
+    for (const DockPanel* panel : page->panels()) {
+        const DockPanel* tab = panel->tabifyPanel();
+        if (!tab) {
+            continue;
+        }
+
+        panel->dockWidget()->addDockWidgetAsTab(tab->dockWidget());
+
+        KDDockWidgets::Frame* frame = panel->dockWidget()->frame();
+        if (frame) {
+            frame->setCurrentTabIndex(0);
+        }
+    }
+}
+
+void DockWindow::loadPageToolbars(const DockPage* page)
+{
+    QList<DockToolBar*> leftSideToolbars;
+    QList<DockToolBar*> rightSideToolbars;
+    QList<DockToolBar*> topSideToolbars;
+    QList<DockToolBar*> bottomSideToolbars;
+
+    QList<DockToolBar*> pageToolBars = page->toolBars();
+    for (DockToolBar* toolBar : pageToolBars) {
+        switch (toolBar->location()) {
+        case DockBase::DockLocation::Left:
+            leftSideToolbars << toolBar;
+            break;
+        case DockBase::DockLocation::Right:
+            rightSideToolbars << toolBar;
+            break;
+        case DockBase::DockLocation::Top:
+            topSideToolbars << toolBar;
+            break;
+        case DockBase::DockLocation::Bottom:
+            bottomSideToolbars << toolBar;
+            break;
+        case DockBase::DockLocation::Center:
+        case DockBase::DockLocation::Undefined:
+            LOGW() << "Error location for toolbar";
+            break;
+        }
+    }
+
+    for (int i = leftSideToolbars.size() - 1; i >= 0; --i) {
+        addDock(leftSideToolbars[i], KDDockWidgets::Location_OnLeft);
+    }
+
+    for (int i = 0; i < rightSideToolbars.size(); ++i) {
+        addDock(rightSideToolbars[i], KDDockWidgets::Location_OnRight);
+    }
+
+    for (int i = 0; i < bottomSideToolbars.size(); ++i) {
+        addDock(bottomSideToolbars[i], KDDockWidgets::Location_OnBottom);
+    }
+
+    for (int i = topSideToolbars.size() - 1; i >= 0; --i) {
+        addDock(topSideToolbars[i], KDDockWidgets::Location_OnTop);
+    }
+}
+
+void DockWindow::loadPagePanels(const DockPage* page)
+{
+    QList<DockPanel*> leftSidePanels;
+    QList<DockPanel*> rightSidePanels;
+    QList<DockPanel*> topSidePanels;
+    QList<DockPanel*> bottomSidePanels;
+
+    QList<DockPanel*> pagePanels = page->panels();
+    for (DockPanel* panel : pagePanels) {
+        switch (panel->location()) {
+        case DockBase::DockLocation::Left:
+            leftSidePanels << panel;
+            break;
+        case DockBase::DockLocation::Right:
+            rightSidePanels << panel;
+            break;
+        case DockBase::DockLocation::Top:
+            topSidePanels << panel;
+            break;
+        case DockBase::DockLocation::Bottom:
+            bottomSidePanels << panel;
+            break;
+        default:
+            if (panel->allowedAreas() & Qt::BottomDockWidgetArea) {
+                bottomSidePanels << panel;
+            } else {
+                leftSidePanels << panel;
+            }
+            break;
+        }
+    }
+
+    for (int i = leftSidePanels.size() - 1; i >= 0; --i) {
+        addDock(leftSidePanels[i], KDDockWidgets::Location_OnLeft);
+    }
+
+    for (int i = 0; i < rightSidePanels.size(); ++i) {
+        addDock(rightSidePanels[i], KDDockWidgets::Location_OnRight);
+    }
+
+    for (int i = 0; i < bottomSidePanels.size(); ++i) {
+        addDock(bottomSidePanels[i], KDDockWidgets::Location_OnBottom);
+    }
+
+    for (int i = topSidePanels.size() - 1; i >= 0; --i) {
+        addDock(topSidePanels[i], KDDockWidgets::Location_OnTop);
+    }
+}
+
+void DockWindow::addDock(DockBase* dock, KDDockWidgets::Location location, const DockBase* relativeTo)
+{
+    IF_ASSERT_FAILED(dock) {
+        return;
+    }
+
+    KDDockWidgets::DockWidgetBase* relativeDock = relativeTo ? relativeTo->dockWidget() : nullptr;
+    m_mainWindow->addDockWidget(dock->dockWidget(), location, relativeDock, dock->preferredSize());
+}
+
+DockPage* DockWindow::pageByUri(const QString& uri) const
+{
+    for (DockPage* page : m_pages.list()) {
+        if (page->uri() == uri) {
+            return page;
+        }
+    }
+
+    return nullptr;
+}
+
+DockPage* DockWindow::currentPage() const
+{
+    return pageByUri(m_currentPageUri);
+}
+
+void DockWindow::saveGeometry()
+{
+    TRACEFUNC;
+
+    /// NOTE: The state of all dock widgets is also saved here,
+    /// since the library does not provide the ability to save
+    /// and restore only the application geometry.
+    /// Therefore, for correct operation after saving or restoring geometry,
+    /// it is necessary to apply the appropriate method for the state.
+    configuration()->setWindowGeometry(windowState());
+}
+
+void DockWindow::restoreGeometry()
+{
+    TRACEFUNC;
+
+    if (!restoreLayout(configuration()->windowGeometry())) {
+        LOGE() << "Could not restore the window geometry!";
+    }
+}
+
+void DockWindow::savePageState(const QString& pageName)
+{
+    TRACEFUNC;
+
+    configuration()->setPageState(pageName, windowState());
+}
+
+void DockWindow::restorePageState(const QString& pageName)
+{
+    TRACEFUNC;
+
+    /// NOTE: Do not restore geometry
+    bool ok = restoreLayout(configuration()->pageState(pageName), KDDockWidgets::RestoreOption::RestoreOption_RelativeToMainWindow);
+    if (!ok) {
+        LOGE() << "Could not restore the state of " << pageName << "!";
+    }
+}
+
+bool DockWindow::restoreLayout(const QByteArray& layout, KDDockWidgets::RestoreOptions)
+{
+    if (layout.isEmpty()) {
+        return true;
+    }
+
+    LOGI() << "TODO: restoring of layout is temporary disabled because it troubles";
+    //KDDockWidgets::LayoutSaver layoutSaver(option);
+    //return layoutSaver.restoreLayout(state);
+
+    return true;
+}
+
+QByteArray DockWindow::windowState() const
+{
+    TRACEFUNC;
+
+    KDDockWidgets::LayoutSaver layoutSaver;
+    return layoutSaver.serializeLayout();
+}
+
+void DockWindow::resetWindowState()
+{
+    TRACEFUNC;
+
+    QString currentPageUriBackup = m_currentPageUri;
+
+    /// NOTE: for reset geometry
+    m_currentPageUri.clear();
+
+    loadPage(currentPageUriBackup);
+}
+
+void DockWindow::initDocks(DockPage* page)
+{
+    for (DockToolBar* toolbar : m_toolBars.list()) {
+        toolbar->init();
+    }
+
+    m_mainToolBarDockingHolder->init();
+
+    if (page) {
+        page->init();
+    }
+}
+
+DockToolBarHolder* DockWindow::resolveToolbarDockingHolder(const QPoint& localPos) const
+{
+    const DockPage* page = currentPage();
+    if (!page) {
+        return nullptr;
+    }
+
+    const KDDockWidgets::DockWidgetBase* centralDock = page->centralDock()->dockWidget();
+    if (!centralDock) {
+        return nullptr;
+    }
+
+    QRect centralFrameGeometry = centralDock->frameGeometry();
+    centralFrameGeometry.moveTopLeft(m_mainWindow->mapFromGlobal(centralDock->mapToGlobal({ centralDock->x(), centralDock->y() })));
+
+    QRect mainFrameGeometry = m_mainWindow->rect();
+    DockToolBarHolder* newHolder = nullptr;
+
+    if (localPos.y() < MAX_DISTANCE_TO_HOLDER) { // main toolbar holder
+        newHolder = m_mainToolBarDockingHolder;
+    }
+    // TODO: Need to take any panels docked at top into account
+    else if (localPos.y() > centralFrameGeometry.top()
+             && localPos.y() < centralFrameGeometry.top() + MAX_DISTANCE_TO_HOLDER) {   // page top toolbar holder
+        newHolder = page->toolBarHolderByLocation(DockBase::DockLocation::Top);
+    } else if (localPos.y() < centralFrameGeometry.bottom()) { // page left toolbar holder
+        if (localPos.x() < MAX_DISTANCE_TO_HOLDER) {
+            newHolder = page->toolBarHolderByLocation(DockBase::DockLocation::Left);
+        } else if (localPos.x() > mainFrameGeometry.right() - MAX_DISTANCE_TO_HOLDER) { // page right toolbar holder
+            newHolder = page->toolBarHolderByLocation(DockBase::DockLocation::Right);
+        }
+    } else if (localPos.y() < mainFrameGeometry.bottom()) { // page bottom toolbar holder
+        newHolder = page->toolBarHolderByLocation(DockBase::DockLocation::Bottom);
+    }
+
+    return newHolder;
+}
+
+DockPanelHolder* DockWindow::resolvePanelDockingHolder(const QPoint& localPos) const
+{
+    const DockPage* page = currentPage();
+    if (!page) {
+        return nullptr;
+    }
+
+    const KDDockWidgets::DockWidgetBase* centralDock = page->centralDock()->dockWidget();
+    if (!centralDock) {
+        return nullptr;
+    }
+
+    QRect centralFrameGeometry = centralDock->frameGeometry();
+    centralFrameGeometry.moveTopLeft(m_mainWindow->mapFromGlobal(centralDock->mapToGlobal({ centralDock->x(), centralDock->y() })));
+    DockPanelHolder* newHolder = nullptr;
+
+    if (localPos.y() > centralFrameGeometry.top()
+        && localPos.y() < centralFrameGeometry.top() + MAX_DISTANCE_TO_HOLDER) { // page top panel holder
+        newHolder = page->panelHolderByLocation(DockBase::DockLocation::Top);
+    } else if (localPos.y() < centralFrameGeometry.bottom()) { // page left panel holder
+        if (localPos.x() < MAX_DISTANCE_TO_HOLDER) {
+            newHolder = page->panelHolderByLocation(DockBase::DockLocation::Left);
+        } else if (localPos.x() > centralFrameGeometry.right() - MAX_DISTANCE_TO_HOLDER) { // page right panel holder
+            newHolder = page->panelHolderByLocation(DockBase::DockLocation::Right);
+        }
+    } else if (localPos.y() < centralFrameGeometry.bottom()) { // page bottom panel holder
+        newHolder = page->panelHolderByLocation(DockBase::DockLocation::Bottom);
+    }
+
+    return newHolder;
+}
+
+void DockWindow::hideCurrentToolBarDockingHolder()
+{
+    if (!m_currentToolBarDockingHolder) {
+        return;
+    }
+
+    m_currentToolBarDockingHolder->hide();
+    m_currentToolBarDockingHolder = nullptr;
+}
+
+void DockWindow::hideCurrentPanelDockingHolder()
+{
+    if (!m_currentPanelDockingHolder) {
+        return;
+    }
+
+    m_currentPanelDockingHolder->hide();
+    m_currentPanelDockingHolder = nullptr;
+}
+
+bool DockWindow::isMouseOverCurrentToolBarDockingHolder(const QPoint& mouseLocalPos) const
+{
+    if (!m_currentToolBarDockingHolder || !m_mainWindow) {
+        return false;
+    }
+
+    const KDDockWidgets::DockWidgetBase* holderDock = m_currentToolBarDockingHolder->dockWidget();
+    if (!holderDock) {
+        return false;
+    }
+
+    QRect holderFrameGeometry = holderDock->frameGeometry();
+    holderFrameGeometry.setTopLeft(m_mainWindow->mapFromGlobal(holderDock->mapToGlobal({ holderDock->x(), holderDock->y() })));
+    return holderFrameGeometry.contains(mouseLocalPos);
+}
+
+bool DockWindow::isMouseOverCurrentPanelDockingHolder(const QPoint& mouseLocalPos) const
+{
+    if (!m_currentPanelDockingHolder || !m_mainWindow) {
+        return false;
+    }
+
+    const KDDockWidgets::DockWidgetBase* holderDock = m_currentPanelDockingHolder->dockWidget();
+    if (!holderDock) {
+        return false;
+    }
+
+    QRect holderFrameGeometry = holderDock->frameGeometry();
+    holderFrameGeometry.setTopLeft(m_mainWindow->mapFromGlobal(holderDock->mapToGlobal({ holderDock->x(), holderDock->y() })));
+    return holderFrameGeometry.contains(mouseLocalPos);
 }

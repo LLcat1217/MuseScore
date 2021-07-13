@@ -1,4 +1,25 @@
-import QtQuick 2.7
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+import QtQuick 2.15
 import QtQuick.Controls 2.0
 import QtQuick.Controls 1.5
 import QtQuick.Layouts 1.3
@@ -9,7 +30,14 @@ import MuseScore.Ui 1.0
 Rectangle {
     id: root
 
-    color: ui.theme.backgroundPrimaryColor
+    color: ui.theme.backgroundSecondaryColor
+
+    NavigationSection {
+        id: navSec
+        name: "GeneralComponentsGallery"
+        enabled: root.visible
+        order: 4
+    }
 
     Flickable {
         id: flickableWrapper
@@ -30,9 +58,12 @@ Rectangle {
                 width: parent.width
 
                 model: [
-                    { textRole: "StyledComboBox", componentRole: comboboxSample },
+                    { textRole: "Dropdown", componentRole: dropdownSample },
                     { textRole: "StyledPopup", componentRole: popupSample },
+                    { textRole: "StyledPopupView", componentRole: styledPopupViewComponent },
+                    { textRole: "StyledMenu", componentRole: styledMenuComponent },
                     { textRole: "CheckBox", componentRole: checkBoxSample },
+                    { textRole: "VisibilityBox", componentRole: visibilityBoxSample },
                     { textRole: "ColorPicker", componentRole: colorPickerSample },
                     { textRole: "ExpandableBlank", componentRole: expandableBlankSample },
                     { textRole: "FlatButton", componentRole: flatButtonSample },
@@ -40,14 +71,20 @@ Rectangle {
                     { textRole: "RadioButtonGroup + FlatRadioButton", componentRole: flatRadioButtonSample },
                     { textRole: "RoundedRadioButton", componentRole: roundedRadioButtonSample },
                     { textRole: "IncrementalPropertyControl (Hidden icon, Icon left, Icon right)", componentRole: incrementalPropertyControlSample },
-                    { textRole: "FlatToogleButton", componentRole: flatToogleButtonSample },
+                    { textRole: "FlatToggleButton", componentRole: flatToggleButtonSample },
                     { textRole: "RoundedRectangle (which allows to round the particular corners)", componentRole: roundedRectangleSample },
                     { textRole: "TextInputField", componentRole: textInputFieldSample },
                     { textRole: "SearchField", componentRole: searchFieldSample },
+                    { textRole: "FilePicker", componentRole: filePickerSample },
                     { textRole: "TabPanel", componentRole: tabPanelSample },
                     { textRole: "GradientTabButton", componentRole: gradientTabButtonsSample },
-                    { textRole: "GridView", componentRole: gridViewVertical }
+                    { textRole: "GridView", componentRole: gridViewVertical },
+                    { textRole: "StyledSlider", componentRole: slidersSample },
+                    { textRole: "NumberInputField", componentRole: numberInputFieldSample },
+                    { textRole: "TimeInputField", componentRole: timeInputFieldSample },
+                    { textRole: "ValueList", componentRole: valueListSample }
                 ]
+
                 delegate: Column {
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -70,35 +107,57 @@ Rectangle {
     }
 
     Component {
-        id: comboboxSample
+        id: dropdownSample
 
-        StyledComboBox {
+        Row {
+            spacing: 16
 
-            property var currValue
+            NavigationPanel {
+                id: dropdownNav
+                name: "Dropdowns"
+                section: navSec
+                order: 1
+            }
 
-            width: 400
+            Dropdown {
+                navigation.name: "Dropdown 1"
+                navigation.panel: dropdownNav
+                navigation.order: 1
+                currentIndex: 0
+                model: [
+                    { text: "1 Option 1", value: 1 },
+                    { text: "2 Option 2", value: 2 },
+                    { text: "3 Option 3", value: 3 },
+                    { text: "4 Option 4", value: 4 },
+                    { text: "5 Option 5", value: 5 },
+                    { text: "6 Option 6", value: 6 },
+                    { text: "7 Option 7", value: 7 },
+                    { text: "8 Option 8", value: 8 },
+                    { text: "9 Option 9", value: 9 },
+                    { text: "10 Option 10", value: 10 },
+                    { text: "11 Option 11", value: 11 }
+                ]
+            }
 
-            textRoleName: "text"
-            valueRoleName: "value"
-
-            model: [
-                { text: "Option 1", value: 1 },
-                { text: "Option 2", value: 2 },
-                { text: "Option 3", value: 3 },
-                { text: "Option 4", value: 4 },
-                { text: "Option 5", value: 5 },
-                { text: "Option 6", value: 6 },
-                { text: "Option 7", value: 7 },
-                { text: "Option 8", value: 8 },
-                { text: "Option 9", value: 9 },
-                { text: "Option 10", value: 10 },
-                { text: "Option 11", value: 11 }
-            ]
-
-            currentIndex: indexOfValue(currValue)
-
-            onValueChanged: {
-                currValue = value
+            Dropdown {
+                navigation.name: "Dropdown 2"
+                navigation.panel: dropdownNav
+                navigation.order: 2
+                currentIndex: 10
+                popupWidth: 200
+                model: [
+                    { text: "Option 1", value: 1 },
+                    { text: "Option 2", value: 2 },
+                    { text: "Option 3", value: 3 },
+                    { text: "Option 4", value: 4 },
+                    { text: "Option 5", value: 5 },
+                    { text: "Option 6", value: 6 },
+                    { text: "Option 7", value: 7 },
+                    { text: "Option 8", value: 8 },
+                    { text: "Option 9", value: 9 },
+                    { text: "Option 10", value: 10 },
+                    { text: "Option 11", value: 11 }
+                ]
             }
         }
     }
@@ -106,37 +165,156 @@ Rectangle {
     Component {
         id: popupSample
 
-        Item {
-            width: root.width
-            height: 40
+        Row {
+            spacing: 12
 
             FlatButton {
-                id: popupButton
+                id: popupDownButton
 
-                text: "Click to show popup"
+                text: "Show Popup downward"
 
                 onClicked: {
-                    if (popup.opened) {
-                        popup.close()
-                        return
+                    if (popupDown.opened) {
+                        popupDown.close()
+                    } else {
+                        popupDown.open()
                     }
-
-                    popup.open()
                 }
             }
 
             StyledPopup {
-                id: popup
+                id: popupDown
 
                 width: 200
                 height: 200
 
-                y: popupButton.y + popupButton.height
+                anchorItem: popupDownButton
 
                 StyledTextLabel {
                     text: "Hello, World!"
 
                     anchors.centerIn: parent
+                }
+            }
+
+            FlatButton {
+                id: popupUpButton
+
+                text: "Show Popup upward"
+
+                onClicked: {
+                    if (popupUp.opened) {
+                        popupUp.close()
+                    } else {
+                        popupUp.open()
+                    }
+                }
+            }
+
+            StyledPopup {
+                id: popupUp
+
+                width: 200
+                height: 200
+
+                anchorItem: popupUpButton
+
+                opensUpward: true
+
+                StyledTextLabel {
+                    text: "Hello, World!"
+
+                    anchors.centerIn: parent
+                }
+            }
+        }
+    }
+
+    Component {
+        id: styledPopupViewComponent
+
+        Row {
+            spacing: 12
+
+            FlatButton {
+                text: "Show PopupView"
+
+                onClicked: {
+                    popupView.toggleOpened()
+                }
+
+                StyledPopupView {
+                    id: popupView
+
+                    contentWidth: layout.childrenRect.width
+                    contentHeight: layout.childrenRect.height
+
+                    Column {
+                        id: layout
+                        spacing: 12
+                        anchors.fill: parent
+
+                        CheckBox {
+                            text: "Some checkbox"
+                        }
+
+                        FlatButton {
+                            text: "Some button"
+                        }
+
+                        FlatButton {
+                            text: "Accent button 1"
+                            accentButton: true
+                        }
+
+                        FlatButton {
+                            text: "Accent button 2"
+                            accentButton: true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: styledMenuComponent
+
+        Row {
+            spacing: 12
+
+            FlatButton {
+                text: "Show Menu"
+
+                onClicked: {
+                    var _subitems = [
+                                {code: "2", icon: IconCode.PAGE, title: "first action", enabled: true},
+                                {code: "3", icon: IconCode.PAGE, title: "with subitems", enabled: true, subitems: [
+                                        {code: "4", title: "first action", enabled: true, selectable: true},
+                                        {code: "5", title: "second action", enabled: true, selectable: true, selected: true},
+                                        {code: "6", title: "third action", enabled: true, selectable: true},
+                                        {},
+                                        {code: "7", title: "clear"}
+                                    ]}
+                            ]
+
+                    var items = [
+                                {code: "0", icon: IconCode.PAGE, title: "enabled action", enabled: true},
+                                {code: "1", icon: IconCode.AMBITUS, title: "with subitems", enabled: true, shortcut: "Ctrl+A", subitems: _subitems },
+                                {},
+                                {code: "5", title: "with shortcut", enabled: true, shortcut: "Ctrl+Shift+G"},
+                                {code: "6", icon: IconCode.PAGE, title: "disabled action", enabled: false},
+                                {code: "7", icon: IconCode.CLEF_BASS, title: "checkable action", enabled: true, checkable: true, checked: true}
+                            ]
+
+                    menuLoader.toggleOpened(items)
+                }
+
+                StyledMenuLoader {
+                    id: menuLoader
+                    onHandleAction: {
+                        console.log("selected " + actionCode + " index " + actionIndex)
+                    }
                 }
             }
         }
@@ -151,6 +329,24 @@ Rectangle {
             text: "Option"
             onClicked: {
                 checked = !checked
+            }
+        }
+    }
+
+    Component {
+        id: visibilityBoxSample
+
+        Column {
+            spacing: 8
+
+            width: 200
+
+            VisibilityBox {
+                text: "Visibility Box"
+
+                onVisibleToggled: {
+                    isVisible = !isVisible
+                }
             }
         }
     }
@@ -413,9 +609,9 @@ Rectangle {
     }
 
     Component {
-        id: flatToogleButtonSample
+        id: flatToggleButtonSample
 
-        FlatToogleButton {
+        FlatToggleButton {
             id: lockButton
 
             height: 20
@@ -446,6 +642,8 @@ Rectangle {
                 topLeftRadius: 40
 
                 color: "gray"
+                border.color: "red"
+                border.width: 3
             }
 
             RoundedRectangle {
@@ -455,6 +653,8 @@ Rectangle {
                 topRightRadius: 30
 
                 color: "gray"
+                border.color: "yellow"
+                border.width: 10
             }
 
             RoundedRectangle {
@@ -464,6 +664,8 @@ Rectangle {
                 bottomLeftRadius: 20
 
                 color: "gray"
+                border.color: "green"
+                border.width: 8
             }
 
             RoundedRectangle {
@@ -473,6 +675,8 @@ Rectangle {
                 bottomRightRadius: 10
 
                 color: "gray"
+                border.color: "blue"
+                border.width: 5
             }
         }
     }
@@ -490,6 +694,16 @@ Rectangle {
         id: searchFieldSample
 
         SearchField {}
+    }
+
+    Component {
+        id: filePickerSample
+
+        FilePicker {
+            width: 220
+
+            path: "/some/test/path/foo.txt"
+        }
     }
 
     Component {
@@ -686,6 +900,87 @@ Rectangle {
                     height: gridView.cellHeight
 
                     text: Boolean(item) ? item.name : ""
+                }
+            }
+        }
+    }
+
+    Component {
+        id: slidersSample
+
+        Column {
+            spacing: 12
+
+            StyledSlider {
+                value: 0.25
+            }
+
+            StyledSlider {
+                orientation: Qt.Vertical
+                value: 0.75
+            }
+        }
+    }
+
+    Component {
+        id: numberInputFieldSample
+
+        NumberInputField {
+            maxValue: 999
+            value: 33
+        }
+    }
+
+    Component {
+        id: timeInputFieldSample
+
+        TimeInputField {
+            Component.onCompleted: {
+                time = new Date(2021, 1, 3, 1, 23, 44, 3)
+            }
+        }
+    }
+
+    Component {
+        id: valueListSample
+
+        ValueList {
+
+            width: 560
+            height: 226
+
+            keyRoleName: "name"
+            keyTitle: "Name"
+            valueRoleName: "age"
+            valueTitle: "Age"
+
+            model: ListModel {
+                ListElement {
+                    name: "Alex"
+                    age: 12
+                    valueType: "Int"
+                    min: 1
+                    max: 15
+                }
+                ListElement {
+                    name: "Tony"
+                    age: 15
+                    valueType: "Int"
+                }
+                ListElement {
+                    name: "Fred"
+                    age: 10
+                    valueType: "Int"
+                }
+                ListElement {
+                    name: "Emma"
+                    age: 5
+                    valueType: "Int"
+                }
+                ListElement {
+                    name: "Anna"
+                    age: 11
+                    valueType: "Int"
                 }
             }
         }

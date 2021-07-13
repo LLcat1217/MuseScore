@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
@@ -6,14 +27,13 @@ import MuseScore.UiComponents 1.0
 import MuseScore.Ui 1.0
 import "../../common"
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property QtObject barlineSettingsModel: null
     property QtObject staffSettingsModel: null
 
-    implicitHeight: contentColumn.implicitHeight + topPadding + bottomPadding
-    width: parent.width
+    contentHeight: contentColumn.implicitHeight
 
     Column {
         id: contentColumn
@@ -23,14 +43,13 @@ StyledPopup {
         spacing: 16
 
         InspectorPropertyView {
-            titleText: qsTr("Style")
+            titleText: qsTrc("inspector", "Style")
             propertyItem: root.barlineSettingsModel ? root.barlineSettingsModel.type : null
 
-            StyledComboBox {
-                width: parent.width
+            Dropdown {
+                id: styles
 
-                textRoleName: "text"
-                valueRoleName: "value"
+                width: parent.width
 
                 model: [
                     { text: qsTranslate("symUserNames", "Single barline"), value: BarlineTypes.TYPE_NORMAL },
@@ -46,16 +65,16 @@ StyledPopup {
                     { text: qsTranslate("symUserNames", "Heavy double barline"), value: BarlineTypes.TYPE_DOUBLE_HEAVY },
                 ]
 
-                currentIndex: root.barlineSettingsModel && !root.barlineSettingsModel.type.isUndefined ? indexOfValue(root.barlineSettingsModel.type.value) : -1
+                currentIndex: root.barlineSettingsModel && !root.barlineSettingsModel.type.isUndefined ? styles.indexOfValue(root.barlineSettingsModel.type.value) : -1
 
-                onValueChanged: {
-                    root.barlineSettingsModel.type.value = value
+                onCurrentValueChanged: {
+                    root.barlineSettingsModel.type.value = styles.currentValue
                 }
             }
         }
 
         InspectorPropertyView {
-            titleText: qsTr("Repeat style")
+            titleText: qsTrc("inspector", "Repeat style")
             propertyItem: barlineSettingsModel ? barlineSettingsModel.hasToShowTips : null
 
             RadioButtonGroup {
@@ -92,7 +111,7 @@ StyledPopup {
 
             isIndeterminate: barlineSettingsModel ? barlineSettingsModel.isSpanToNextStaff.isUndefined : false
             checked: barlineSettingsModel && !isIndeterminate ? barlineSettingsModel.isSpanToNextStaff.value : false
-            text: qsTr("Span to next staff")
+            text: qsTrc("inspector", "Span to next staff")
 
             onClicked: { barlineSettingsModel.isSpanToNextStaff.value = !checked }
         }
@@ -110,7 +129,7 @@ StyledPopup {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
-                titleText: qsTr("Span from")
+                titleText: qsTrc("inspector", "Span from")
                 propertyItem: barlineSettingsModel ? barlineSettingsModel.spanFrom : null
 
                 IncrementalPropertyControl {
@@ -129,7 +148,7 @@ StyledPopup {
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
-                titleText: qsTr("Span to")
+                titleText: qsTrc("inspector", "Span to")
                 propertyItem: barlineSettingsModel ? barlineSettingsModel.spanTo : null
 
                 IncrementalPropertyControl {
@@ -150,7 +169,7 @@ StyledPopup {
         FlatButton {
             width: parent.width
 
-            text: qsTr("Apply to all staffs")
+            text: qsTrc("inspector", "Apply to all staffs")
 
             enabled: !spanFromControl.isIndeterminate && !spanToControl.isIndeterminate
 
@@ -171,27 +190,27 @@ StyledPopup {
             width: parent.width
 
             StyledTextLabel {
-                text: qsTr("Span presets")
+                text: qsTrc("inspector", "Span presets")
             }
 
             RowLayout {
                 width: parent.width
 
                 FlatButton {
-                    text: qsTr("Default")
+                    text: qsTrc("inspector", "Default")
                     Layout.fillWidth: true
                     onClicked: { barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_DEFAULT) }
                 }
 
                 FlatButton {
-                    text: qsTr("Tick 1")
+                    text: qsTrc("inspector", "Tick 1")
                     Layout.fillWidth: true
                     onClicked: { barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_TICK_1) }
                 }
 
 
                 FlatButton {
-                    text: qsTr("Tick 2")
+                    text: qsTrc("inspector", "Tick 2")
                     Layout.fillWidth: true
                     onClicked: { barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_TICK_2) }
                 }
@@ -201,13 +220,13 @@ StyledPopup {
                 width: parent.width
 
                 FlatButton {
-                    text: qsTr("Short 1")
+                    text: qsTrc("inspector", "Short 1")
                     Layout.fillWidth: true
                     onClicked: { barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_SHORT_1) }
                 }
 
                 FlatButton {
-                    text: qsTr("Short 2")
+                    text: qsTrc("inspector", "Short 2")
                     Layout.fillWidth: true
                     onClicked: { barlineSettingsModel.applySpanPreset(BarlineTypes.PRESET_SHORT_2) }
                 }

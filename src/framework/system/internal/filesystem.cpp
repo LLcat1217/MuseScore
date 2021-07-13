@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "filesystem.h"
 
 #include <QFileInfo>
@@ -25,7 +28,7 @@
 #include "systemerrors.h"
 
 using namespace mu;
-using namespace mu::framework;
+using namespace mu::system;
 
 Ret FileSystem::exists(const io::path& path) const
 {
@@ -46,6 +49,29 @@ Ret FileSystem::remove(const io::path& path_) const
     }
 
     return make_ret(Err::NoError);
+}
+
+Ret FileSystem::copy(const io::path& src, const io::path& dst, bool replace) const
+{
+    QFileInfo srcFileInfo(src.toQString());
+    if (!srcFileInfo.exists()) {
+        return make_ret(Err::FSNotExist);
+    }
+
+    QFileInfo dstFileInfo(dst.toQString());
+    if (dstFileInfo.exists()) {
+        if (!replace) {
+            return make_ret(Err::FSIsExist);
+        }
+
+        Ret ret = remove(dst);
+        if (!ret) {
+            return ret;
+        }
+    }
+
+    Ret ret = copyRecursively(src, dst);
+    return ret;
 }
 
 RetVal<QByteArray> FileSystem::readFile(const io::path& filePath) const
@@ -69,6 +95,22 @@ RetVal<QByteArray> FileSystem::readFile(const io::path& filePath) const
     file.close();
 
     return result;
+}
+
+Ret FileSystem::writeToFile(const io::path& filePath, const QByteArray& data) const
+{
+    Ret ret = make_ret(Err::NoError);
+
+    QFile file(filePath.toQString());
+    if (!file.open(QIODevice::WriteOnly)) {
+        ret = make_ret(Err::FSWriteError);
+        return ret;
+    }
+
+    file.write(data);
+    file.close();
+
+    return ret;
 }
 
 Ret FileSystem::makePath(const io::path& path) const
@@ -100,9 +142,9 @@ RetVal<io::paths> FileSystem::scanFiles(const io::path& rootDir, const QStringLi
     return result;
 }
 
-Ret FileSystem::removeFile(const QString& path) const
+Ret FileSystem::removeFile(const io::path& path) const
 {
-    QFile file(path);
+    QFile file(path.toQString());
     if (!file.remove()) {
         return make_ret(Err::FSRemoveError);
     }
@@ -110,11 +152,42 @@ Ret FileSystem::removeFile(const QString& path) const
     return make_ret(Err::NoError);
 }
 
-Ret FileSystem::removeDir(const QString& path) const
+Ret FileSystem::removeDir(const io::path& path) const
 {
-    QDir dir(path);
+    QDir dir(path.toQString());
     if (!dir.removeRecursively()) {
         return make_ret(Err::FSRemoveError);
+    }
+
+    return make_ret(Err::NoError);
+}
+
+Ret FileSystem::copyRecursively(const io::path& src, const io::path& dst) const
+{
+    QString srcPath = src.toQString();
+    QString dstPath = dst.toQString();
+
+    QFileInfo srcFileInfo(srcPath);
+    if (srcFileInfo.isDir()) {
+        QDir dstDir(dstPath);
+        dstDir.cdUp();
+        if (!dstDir.mkdir(QFileInfo(dstPath).fileName())) {
+            return make_ret(Err::FSMakingError);
+        }
+        QDir srcDir(srcPath);
+        const QStringList fileNames = srcDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+        for (const QString& fileName : fileNames) {
+            const QString newSrcPath = srcPath + QLatin1Char('/') + fileName;
+            const QString newDstPath = dstPath + QLatin1Char('/') + fileName;
+            Ret ret = copyRecursively(newSrcPath, newDstPath);
+            if (!ret) {
+                return ret;
+            }
+        }
+    } else {
+        if (!QFile::copy(srcPath, dstPath)) {
+            return make_ret(Err::FSCopyError);
+        }
     }
 
     return make_ret(Err::NoError);

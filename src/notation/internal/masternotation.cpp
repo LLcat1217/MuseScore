@@ -1,24 +1,28 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "masternotation.h"
 #include "excerptnotation.h"
 #include "masternotationparts.h"
+#include "scoreorderconverter.h"
 
 #include <QFileInfo>
 
@@ -52,6 +56,16 @@ MasterNotation::MasterNotation()
     m_parts = std::make_shared<MasterNotationParts>(this, interaction(), undoStack());
 }
 
+MasterNotation::~MasterNotation()
+{
+    m_parts = nullptr;
+}
+
+INotationPtr MasterNotation::notation()
+{
+    return shared_from_this();
+}
+
 Meta MasterNotation::metaInfo() const
 {
     Meta meta = Notation::metaInfo();
@@ -63,21 +77,19 @@ Meta MasterNotation::metaInfo() const
     return meta;
 }
 
-mu::Ret MasterNotation::load(const io::path& path)
+void MasterNotation::setMetaInfo(const Meta& meta)
 {
-    TRACEFUNC;
+    Notation::setMetaInfo(meta);
+}
 
-    std::string syffix = io::syffix(path);
-
-    //! NOTE For "mscz", "mscx" see MsczNotationReader
-    //! for others see readers in importexport module
-    auto reader = readers()->reader(syffix);
-    if (!reader) {
-        LOGE() << "not found reader for file: " << path;
-        return make_ret(Ret::Code::InternalError);
+void MasterNotation::setMasterScore(Ms::MasterScore* score)
+{
+    if (masterScore() == score) {
+        return;
     }
 
-    return load(path, reader);
+    setScore(score);
+    initExcerpts();
 }
 
 Ms::MasterScore* MasterNotation::masterScore() const
@@ -85,115 +97,28 @@ Ms::MasterScore* MasterNotation::masterScore() const
     return dynamic_cast<Ms::MasterScore*>(score());
 }
 
-mu::Ret MasterNotation::load(const io::path& path, const INotationReaderPtr& reader)
-{
-    TRACEFUNC;
-
-    Ms::ScoreLoad sl;
-
-    Ms::MasterScore* score = new Ms::MasterScore(scoreGlobal()->baseStyle());
-    Ret ret = doLoadScore(score, path, reader);
-
-    if (ret) {
-        setScore(score);
-        initExcerpts();
-    }
-
-    return ret;
-}
-
-mu::Ret MasterNotation::doLoadScore(Ms::MasterScore* score,
-                                    const io::path& path,
-                                    const std::shared_ptr<INotationReader>& reader) const
-{
-    QFileInfo fi(path.toQString());
-    score->setName(fi.completeBaseName());
-    score->setImportedFilePath(fi.filePath());
-    score->setMetaTag("originalFormat", fi.suffix().toLower());
-
-    Ret ret = reader->read(score, path);
-    if (!ret) {
-        return ret;
-    }
-
-    score->connectTies();
-
-    for (Ms::Part* p : score->parts()) {
-        p->updateHarmonyChannels(false);
-    }
-    score->rebuildMidiMapping();
-    score->setSoloMute();
-    for (Ms::Score* s : score->scoreList()) {
-        s->setPlaylistDirty();
-        s->addLayoutFlags(Ms::LayoutFlag::FIX_PITCH_VELO);
-        s->setLayoutAll();
-    }
-    score->updateChannel();
-    //score->updateExpressive(MuseScore::synthesizer("Fluid"));
-    score->setSaved(true);
-    score->setCreated(false);
-    score->update();
-
-    if (!score->sanityCheck(QString())) {
-        return make_ret(Err::FileCorrupted);
-    }
-
-    return make_ret(Ret::Code::Ok);
-}
-
-mu::io::path MasterNotation::path() const
-{
-    const Ms::MasterScore* score = masterScore();
-
-    if (!score) {
-        return mu::io::path();
-    }
-
-    return score->fileInfo()->canonicalFilePath();
-}
-
 //! NOTE: this method with all of its dependencies was copied from MU3
 //! source: file.cpp, MuseScore::getNewFile()
-mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
+mu::Ret MasterNotation::setupNewScore(Ms::MasterScore* score, Ms::MasterScore* templateScore, const ScoreCreateOptions& scoreOptions)
 {
-    double tempo = scoreOptions.tempo;
-
-    io::path templatePath = scoreOptions.templatePath;
-
     int measures = scoreOptions.measures;
 
     Ms::KeySigEvent ks;
     ks.setKey(scoreOptions.key);
     Ms::VBox* nvb = nullptr;
 
-    bool pickupMeasure = scoreOptions.measureTimesigNumerator > 0 && scoreOptions.measureTimesigDenominator > 0;
+    bool pickupMeasure = scoreOptions.withPickupMeasure;
     if (pickupMeasure) {
         measures += 1;
     }
 
-    Ms::MasterScore* score = new Ms::MasterScore(scoreGlobal()->baseStyle());
-
     QList<Ms::Excerpt*> excerpts;
-    if (!templatePath.empty()) {
-        std::string syffix = io::syffix(templatePath);
-        auto reader = readers()->reader(syffix);
-        if (!reader) {
-            LOGE() << "not found reader for file: " << templatePath;
-            return make_ret(Ret::Code::InternalError);
-        }
-
-        Ms::MasterScore* tscore = new Ms::MasterScore(scoreGlobal()->baseStyle());
-        Ret ret = doLoadScore(tscore, templatePath, reader);
-        if (!ret) {
-            delete tscore;
-            delete score;
-
-            return ret;
-        }
-        score->setStyle(tscore->style());
+    if (templateScore) {
+        score->setStyle(templateScore->style());
+        score->setScoreOrder(templateScore->scoreOrder());
 
         // create instruments from template
-        for (Ms::Part* tpart : tscore->parts()) {
+        for (Ms::Part* tpart : templateScore->parts()) {
             Ms::Part* part = new Ms::Part(score);
             part->setInstrument(tpart->instrument());
             part->setPartName(tpart->partName());
@@ -211,11 +136,11 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
             }
             score->appendPart(part);
         }
-        for (Ms::Excerpt* ex : tscore->excerpts()) {
+        for (Ms::Excerpt* ex : templateScore->excerpts()) {
             Ms::Excerpt* x = new Ms::Excerpt(score);
             x->setTitle(ex->title());
             for (Part* p : ex->parts()) {
-                int pidx = tscore->parts().indexOf(p);
+                int pidx = templateScore->parts().indexOf(p);
                 if (pidx == -1) {
                     LOGE() << "part not found";
                 } else {
@@ -224,7 +149,7 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
             }
             excerpts.append(x);
         }
-        Ms::MeasureBase* mb = tscore->first();
+        Ms::MeasureBase* mb = templateScore->first();
         if (mb && mb->isVBox()) {
             Ms::VBox* tvb = toVBox(mb);
             nvb = new Ms::VBox(score);
@@ -236,19 +161,16 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
             nvb->setBottomMargin(tvb->bottomMargin());
             nvb->setLeftMargin(tvb->leftMargin());
             nvb->setRightMargin(tvb->rightMargin());
+            nvb->setAutoSizeEnabled(tvb->isAutoSizeEnabled());
         }
-        delete tscore;
     } else {
-        score = new Ms::MasterScore(scoreGlobal()->baseStyle());
+        score->setScoreOrder(ScoreOrderConverter::convertScoreOrder(scoreOptions.order));
     }
 
     score->setName(qtrc("notation", "Untitled"));
     score->setCreated(true);
-    setScore(score);
 
-    if (templatePath.empty()) {
-        parts()->setInstruments(scoreOptions.instruments);
-    }
+    setScore(score);
 
     score->style().checkChordList();
     if (!scoreOptions.title.isEmpty()) {
@@ -264,7 +186,7 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
     for (int i = 0; i < measures; ++i) {
         Ms::Fraction tick = firstMeasureTicks + timesig * (i - 1);
         if (i == 0) {
-            tick = Ms::Fraction(0,1);
+            tick = Ms::Fraction(0, 1);
         }
         QList<Ms::Rest*> puRests;
         for (Ms::Score* _score : score->scoreList()) {
@@ -288,7 +210,7 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
                     ts->setTrack(staffIdx * VOICES);
                     ts->setSig(timesig, scoreOptions.timesigType);
                     Ms::Measure* m = _score->firstMeasure();
-                    Ms::Segment* s = m->getSegment(Ms::SegmentType::TimeSig, Ms::Fraction(0,1));
+                    Ms::Segment* s = m->getSegment(Ms::SegmentType::TimeSig, Ms::Fraction(0, 1));
                     s->add(ts);
                     Part* part = staff->part();
                     if (!part->instrument()->useDrumset()) {
@@ -303,11 +225,11 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
                         }
                         // do not create empty keysig unless custom or atonal
                         if (nKey.custom() || nKey.isAtonal() || nKey.key() != Key::C) {
-                            staff->setKey(Ms::Fraction(0,1), nKey);
+                            staff->setKey(Ms::Fraction(0, 1), nKey);
                             Ms::KeySig* keysig = new Ms::KeySig(score);
                             keysig->setTrack(staffIdx * VOICES);
                             keysig->setKeySigEvent(nKey);
-                            Ms::Segment* ss = measure->getSegment(Ms::SegmentType::KeySig, Ms::Fraction(0,1));
+                            Ms::Segment* ss = measure->getSegment(Ms::SegmentType::KeySig, Ms::Fraction(0, 1));
                             ss->add(keysig);
                         }
                     }
@@ -373,7 +295,7 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
         Ms::MeasureBase* measure = score->measures()->first();
         if (measure->type() != ElementType::VBOX) {
             Ms::MeasureBase* nm = nvb ? nvb : new Ms::VBox(score);
-            nm->setTick(Ms::Fraction(0,1));
+            nm->setTick(Ms::Fraction(0, 1));
             nm->setNext(measure);
             score->measures()->add(nm);
             measure = nm;
@@ -412,7 +334,7 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
         Ms::Fraction ts = timesig;
 
         QString text("<sym>metNoteQuarterUp</sym> = %1");
-        double bpm = scoreOptions.tempo;
+        double bpm = scoreOptions.tempo.valueBpm;
         switch (ts.denominator()) {
         case 1:
             text = "<sym>metNoteWhole</sym> = %1";
@@ -467,7 +389,9 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
 
         Ms::TempoText* tt = new Ms::TempoText(score);
         tt->setXmlText(text.arg(bpm));
-        tempo /= 60;          // bpm -> bps
+
+        double tempo = scoreOptions.tempo.valueBpm;
+        tempo /= 60; // bpm -> bps
 
         tt->setTempo(tempo);
         tt->setFollowText(true);
@@ -489,6 +413,10 @@ mu::Ret MasterNotation::createNew(const ScoreCreateOptions& scoreOptions)
 
     score->setExcerptsChanged(true);
 
+    if (!templateScore) {
+        parts()->setParts(scoreOptions.parts);
+    }
+
     return make_ret(Err::NoError);
 }
 
@@ -501,45 +429,6 @@ mu::RetVal<bool> MasterNotation::created() const
     }
 
     return RetVal<bool>::make_ok(score()->created());
-}
-
-mu::Ret MasterNotation::save(const mu::io::path& path)
-{
-    std::string suffix = io::syffix(path);
-    if (suffix != "mscz" && suffix != "mscx" && !suffix.empty()) {
-        return exportScore(path, suffix);
-    }
-
-    if (!path.empty()) {
-        score()->masterScore()->fileInfo()->setFile(path.toQString());
-    }
-
-    bool ok = score()->masterScore()->saveFile(true);
-    if (!ok) {
-        LOGE() << Ms::MScore::lastError;
-    } else {
-        score()->setCreated(false);
-        undoStack()->stackChanged().notify();
-    }
-
-    return ok;
-}
-
-mu::Ret MasterNotation::exportScore(const io::path& path, const std::string& suffix)
-{
-    QFile file(path.toQString());
-    file.open(QFile::WriteOnly);
-
-    auto writer = writers()->writer(suffix);
-    if (!writer) {
-        LOGE() << "Unknown export format:" << suffix;
-        return false;
-    }
-
-    Ret ret = writer->write(shared_from_this(), file);
-    file.close();
-
-    return ret;
 }
 
 mu::ValNt<bool> MasterNotation::needSave() const
@@ -562,11 +451,13 @@ void MasterNotation::initExcerpts(const QList<Ms::Excerpt*>& scoreExcerpts)
     ExcerptNotationList notationExcerpts;
 
     for (Ms::Excerpt* excerpt : excerpts) {
-        masterScore()->initExcerpt(excerpt);
+        masterScore()->initExcerpt(excerpt, true);
         notationExcerpts.push_back(std::make_shared<ExcerptNotation>(excerpt));
     }
 
     doSetExcerpts(notationExcerpts);
+
+    updateExcerpts();
 
     m_parts->partsChanged().onNotify(this, [this]() {
         notifyAboutNotationChanged();
@@ -610,11 +501,11 @@ void MasterNotation::createNonexistentExcerpts(const ExcerptNotationList& newExc
 {
     for (IExcerptNotationPtr excerptNotation : newExcerpts) {
         bool isNewExcerpt = std::find(m_excerpts.val.begin(), m_excerpts.val.end(), excerptNotation) == m_excerpts.val.end();
-        bool isEmpty = excerptNotation->parts()->partList().empty();
+        bool isEmpty = excerptNotation->notation()->parts()->partList().empty();
 
         if (isNewExcerpt && isEmpty) {
             Ms::Excerpt* excerpt = new Ms::Excerpt(masterScore());
-            masterScore()->initExcerpt(excerpt);
+            masterScore()->initExcerpt(excerpt, false);
             get_impl(excerptNotation)->setExcerpt(excerpt);
         }
     }
@@ -625,8 +516,13 @@ void MasterNotation::updateExcerpts()
     ExcerptNotationList newExcerpts;
 
     for (IExcerptNotationPtr excerpt : m_excerpts.val) {
-        if (!get_impl(excerpt)->excerpt()->isEmpty()) {
+        Ms::Excerpt* ex = get_impl(excerpt)->excerpt();
+        if (!ex->isEmpty()) {
             newExcerpts.push_back(excerpt);
+        } else {
+            if (masterScore()->excerpts().contains(ex)) {
+                masterScore()->undo(new Ms::RemoveExcerpt(ex));
+            }
         }
     }
 
@@ -652,7 +548,13 @@ void MasterNotation::updateExcerpts()
 IExcerptNotationPtr MasterNotation::createExcerpt(Part* part)
 {
     Ms::Excerpt* excerpt = Ms::Excerpt::createExcerptFromPart(part);
-    masterScore()->initExcerpt(excerpt);
+    masterScore()->initExcerpt(excerpt, false);
 
     return std::make_shared<ExcerptNotation>(excerpt);
+}
+
+void MasterNotation::onSaveCopy()
+{
+    score()->setCreated(false);
+    undoStack()->stackChanged().notify();
 }

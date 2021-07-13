@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "palettemodule.h"
 
 #include <QQmlEngine>
@@ -26,32 +29,29 @@
 #include "modularity/ioc.h"
 #include "ui/iuiengine.h"
 #include "ui/iinteractiveuriregister.h"
+#include "ui/iuiactionsregister.h"
 
 #include "internal/mu4paletteadapter.h"
 #include "internal/paletteconfiguration.h"
 #include "internal/palette/masterpalette.h"
 #include "internal/paletteactionscontroller.h"
-#include "internal/paletteactions.h"
+#include "internal/paletteuiactions.h"
 
 #include "view/paletterootmodel.h"
 #include "view/palettepropertiesmodel.h"
 #include "view/palettecellpropertiesmodel.h"
 
-#include "workspace/iworkspacedatastreamregister.h"
-#include "internal/workspacepalettestream.h"
-
 #include "internal/paletteworkspacesetup.h"
 
-#include "libmscore/score.h"
-#include "libmscore/sym.h"
-
-#include "actions/iactionsregister.h"
-
 using namespace mu::palette;
-using namespace mu::framework;
+using namespace mu::modularity;
+using namespace mu::ui;
 
 static std::shared_ptr<MU4PaletteAdapter> s_adapter = std::make_shared<MU4PaletteAdapter>();
 static std::shared_ptr<PaletteActionsController> s_actionsController = std::make_shared<PaletteActionsController>();
+static std::shared_ptr<PaletteUiActions> s_paletteUiActions = std::make_shared<PaletteUiActions>(s_actionsController);
+static std::shared_ptr<PaletteConfiguration> s_configuration = std::make_shared<PaletteConfiguration>();
+static std::shared_ptr<PaletteWorkspaceSetup> s_paletteWorkspaceSetup = std::make_shared<PaletteWorkspaceSetup>();
 
 static void palette_init_qrc()
 {
@@ -65,37 +65,21 @@ std::string PaletteModule::moduleName() const
 
 void PaletteModule::registerExports()
 {
-    framework::ioc()->registerExport<IPaletteAdapter>(moduleName(), s_adapter);
-    framework::ioc()->registerExport<IPaletteConfiguration>(moduleName(), std::make_shared<PaletteConfiguration>());
-
-    // create a score for internal use
-    Ms::gscore = new Ms::MasterScore();
-    Ms::gscore->setPaletteMode(true);
-    Ms::gscore->setMovements(new Ms::Movements());
-    Ms::gscore->setStyle(Ms::MScore::baseStyle());
-
-    Ms::gscore->style().set(Ms::Sid::MusicalTextFont, QString("Bravura Text"));
-    Ms::ScoreFont* scoreFont = Ms::ScoreFont::fontFactory("Bravura");
-    Ms::gscore->setScoreFont(scoreFont);
-    Ms::gscore->setNoteHeadWidth(scoreFont->width(Ms::SymId::noteheadBlack, Ms::gscore->spatium()) / Ms::SPATIUM20);
+    ioc()->registerExport<IPaletteAdapter>(moduleName(), s_adapter);
+    ioc()->registerExport<IPaletteConfiguration>(moduleName(), s_configuration);
 }
 
 void PaletteModule::resolveImports()
 {
-    auto workspaceStreams = ioc()->resolve<workspace::IWorkspaceDataStreamRegister>(moduleName());
-    if (workspaceStreams) {
-        workspaceStreams->regStream(std::make_shared<WorkspacePaletteStream>());
-    }
-
-    auto ar = framework::ioc()->resolve<actions::IActionsRegister>(moduleName());
+    auto ar = ioc()->resolve<ui::IUiActionsRegister>(moduleName());
     if (ar) {
-        ar->reg(std::make_shared<PaletteActions>());
+        ar->reg(s_paletteUiActions);
     }
 
     auto ir = ioc()->resolve<IInteractiveUriRegister>(moduleName());
     if (ir) {
         ir->registerUri(Uri("musescore://palette/masterpalette"),
-                        ContainerMeta(ContainerType::QWidgetDialog, qRegisterMetaType<Ms::MasterPalette>("MasterPallette")));
+                        ContainerMeta(ContainerType::QWidgetDialog, Ms::MasterPalette::static_metaTypeId()));
 
         ir->registerUri(Uri("musescore://palette/properties"),
                         ContainerMeta(ContainerType::QmlDialog, "MuseScore/Palette/PalettePropertiesDialog.qml"));
@@ -124,18 +108,27 @@ void PaletteModule::registerUiTypes()
     qmlRegisterType<PalettePropertiesModel>("MuseScore.Palette", 1, 0, "PalettePropertiesModel");
     qmlRegisterType<PaletteCellPropertiesModel>("MuseScore.Palette", 1, 0, "PaletteCellPropertiesModel");
 
-    framework::ioc()->resolve<framework::IUiEngine>(moduleName())->addSourceImportPath(palette_QML_IMPORT);
+    ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(palette_QML_IMPORT);
 }
 
-void PaletteModule::onInit(const IApplication::RunMode& mode)
+void PaletteModule::onInit(const framework::IApplication::RunMode& mode)
 {
     if (framework::IApplication::RunMode::Editor != mode) {
         return;
     }
 
-    // load workspace
-    PaletteWorkspaceSetup w;
-    w.setup();
-
+    s_configuration->init();
     s_actionsController->init();
+    s_paletteUiActions->init();
+}
+
+void PaletteModule::onAllInited(const framework::IApplication::RunMode& mode)
+{
+    if (framework::IApplication::RunMode::Editor != mode) {
+        return;
+    }
+
+    //! NOTE We need to be sure that the workspaces are initialized.
+    //! So, we loads these settings on onAllInited
+    s_paletteWorkspaceSetup->setup();
 }

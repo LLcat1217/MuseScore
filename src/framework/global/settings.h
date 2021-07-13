@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_FRAMEWORK_SETTINGS_H
 #define MU_FRAMEWORK_SETTINGS_H
 
@@ -24,6 +27,10 @@
 
 #include "val.h"
 #include "async/channel.h"
+#include "io/path.h"
+
+#include "modularity/ioc.h"
+#include "multiinstances/imultiinstancesprovider.h"
 
 //! NOTE We are gradually abandoning Qt in non-GUI classes.
 //! This settings interface is almost independent of Qt,
@@ -35,6 +42,8 @@ class QSettings;
 namespace mu::framework {
 class Settings
 {
+    INJECT(framework, mi::IMultiInstancesProvider, multiInstancesProvider)
+
 public:
     static Settings* instance();
 
@@ -56,6 +65,7 @@ public:
         Key key;
         Val value;
         Val defaultValue;
+        bool canBeMannualyEdited = false;
 
         bool isNull() const { return key.isNull(); }
     };
@@ -67,25 +77,46 @@ public:
     void reload();
     void load();
 
+    void reset(bool keepDefaultSettings = false);
+
     Val value(const Key& key) const;
     Val defaultValue(const Key& key) const;
 
-    void setValue(const Key& key, const Val& value);
+    //! NOTE Will be write to global config and sync between all instances
+    void setSharedValue(const Key& key, const Val& value);
+
+    //! NOTE Will be write to global config and NOT sync between instances
+    void setLocalValue(const Key& key, const Val& value);
+
     void setDefaultValue(const Key& key, const Val& value);
+    void setCanBeMannualyEdited(const Settings::Key& key, bool canBeMannualyEdited);
+
+    void beginTransaction(bool notifyToOtherInstances = true);
+    void commitTransaction(bool notifyToOtherInstances = true);
+    void rollbackTransaction(bool notifyToOtherInstances = true);
 
     async::Channel<Val> valueChanged(const Key& key) const;
+
+    io::path filePath() const;
 
 private:
     Settings();
     ~Settings();
 
     Item& findItem(const Key& key) const;
+    async::Channel<Val>& findChannel(const Key& key) const;
+
+    void insertNewItem(const Key& key, const Val& value);
 
     Items readItems() const;
     void writeValue(const Key& key, const Val& value);
 
+    QString dataPath() const;
+
     QSettings* m_settings = nullptr;
     mutable Items m_items;
+    mutable Items m_localSettings;
+    mutable bool m_isTransactionStarted = false;
     mutable std::map<Key, async::Channel<Val> > m_channels;
 };
 

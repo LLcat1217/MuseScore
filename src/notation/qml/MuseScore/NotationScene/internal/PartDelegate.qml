@@ -1,23 +1,45 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.12
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 
-Item {
+ListItemBlank {
     id: root
 
     property string title: ""
     property int maxTitleWidth: 0
-    property bool isSelected: false
     property bool isMain: false
     property int currentPartIndex: -1
     property alias voicesVisibility: voicesPopup.voicesVisibility
     property alias voicesTitle: voicesLabel.text
 
+    property int sidePadding: 0
+
     signal copyPartRequested()
     signal removePartRequested()
-    signal voicesVisibilityChangeRequested()
+    signal voicesVisibilityChangeRequested(var voiceIndex, var voiceVisible)
     signal partClicked()
 
     function startEditTitle() {
@@ -34,10 +56,20 @@ Item {
 
     height: 42
 
+    onClicked: {
+        voicesPopup.close()
+        root.partClicked()
+    }
+
+    onDoubleClicked: {
+        root.startEditTitle()
+    }
+
     StyledIconLabel {
         id: partIcon
 
         anchors.left: parent.left
+        anchors.leftMargin: root.sidePadding
 
         height: parent.height
         width: height
@@ -122,6 +154,7 @@ Item {
 
     FlatButton {
         anchors.right: parent.right
+        anchors.rightMargin: root.sidePadding
         anchors.verticalCenter: parent.verticalCenter
 
         normalStateColor: "transparent"
@@ -139,14 +172,14 @@ Item {
         y: showVoicesPopupButton.y + showVoicesPopupButton.height
 
         onVoiceVisibilityChangeRequested: {
-            root.voicesVisibilityChangeRequested()
+            root.voicesVisibilityChangeRequested(voiceIndex, voiceVisible)
         }
     }
 
     ContextMenu {
         id: contextMenu
 
-        StyledMenuItem {
+        StyledContextMenuItem {
             id: duplicateItem
 
             text: qsTrc("notation", "Duplicate")
@@ -156,17 +189,17 @@ Item {
             }
         }
 
-        StyledMenuItem {
+        StyledContextMenuItem {
             id: deleteItem
 
-            text: qsTrc("notation", "Delete score")
+            text: qsTrc("notation", "Delete")
 
             onTriggered: {
                 root.removePartRequested()
             }
         }
 
-        StyledMenuItem {
+        StyledContextMenuItem {
             id: renameItem
 
             text: qsTrc("notation", "Rename")
@@ -179,71 +212,6 @@ Item {
         Component.onCompleted: {
             if (root.isMain) {
                 removeItem(deleteItem)
-            }
-        }
-    }
-
-    Rectangle {
-        id: background
-
-        anchors.fill: parent
-        anchors.leftMargin: -root.anchors.leftMargin
-        anchors.rightMargin: -root.anchors.rightMargin
-
-        z: -1
-
-        color: "transparent"
-        opacity: 1
-
-        states: [
-            State {
-                name: "HOVERED"
-                when: mouseArea.containsMouse && !mouseArea.pressed && !root.isSelected
-
-                PropertyChanges {
-                    target: background
-                    opacity: ui.theme.buttonOpacityHover
-                    color: ui.theme.buttonColor
-                }
-            },
-
-            State {
-                name: "PRESSED"
-                when: mouseArea.pressed && !root.isSelected
-
-                PropertyChanges {
-                    target: background
-                    opacity: ui.theme.buttonOpacityHit
-                    color: ui.theme.buttonColor
-                }
-            },
-
-            State {
-                name: "SELECTED"
-                when: root.isSelected
-
-                PropertyChanges {
-                    target: background
-                    opacity: ui.theme.accentOpacityHit
-                    color: ui.theme.accentColor
-                }
-            }
-        ]
-
-        MouseArea {
-            id: mouseArea
-
-            anchors.fill: parent
-
-            hoverEnabled: true
-
-            onClicked: {
-                voicesPopup.close()
-                root.partClicked()
-            }
-
-            onDoubleClicked: {
-                root.startEditTitle()
             }
         }
     }

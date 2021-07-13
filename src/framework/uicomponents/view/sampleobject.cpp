@@ -1,6 +1,27 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "sampleobject.h"
 
-using namespace mu::framework;
+using namespace mu::uicomponents;
 
 SampleObject::SampleObject(QObject* parent)
     : QObject(parent)
@@ -9,15 +30,15 @@ SampleObject::SampleObject(QObject* parent)
 
 SampleObject::State SampleObject::state() const
 {
-    return _state;
+    return m_state;
 }
 
 void SampleObject::next()
 {
-    if (_state == Third) {
-        _state = First;
+    if (m_state == Third) {
+        m_state = First;
     } else {
-        _state = static_cast<State>(static_cast<int>(_state) + 1);
+        m_state = static_cast<State>(static_cast<int>(m_state) + 1);
     }
-    emit stateChanged(_state);
+    emit stateChanged(m_state);
 }

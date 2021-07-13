@@ -1,30 +1,36 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "interactiveprovider.h"
 #include "log.h"
 
 #include <QMetaType>
 #include <QMetaProperty>
-#include <QMainWindow>
+#include <QWindow>
 
-using namespace mu::framework;
+#include "widgetdialog.h"
+
 using namespace mu;
+using namespace mu::ui;
+using namespace mu::framework;
 
 static const QString PAGE_TYPE_DOCK("dock");
 static const QString PAGE_TYPE_POPUP("popup");
@@ -33,6 +39,34 @@ static const QString PAGE_TYPE_WIDGET("widget");
 InteractiveProvider::InteractiveProvider()
     : QObject()
 {
+}
+
+RetVal<Val> InteractiveProvider::question(const std::string& title, const framework::IInteractive::Text& text,
+                                          const framework::IInteractive::ButtonDatas& buttons, int defBtn,
+                                          const framework::IInteractive::Options& options)
+{
+    return openStandardDialog("QUESTION", QString::fromStdString(title), text, buttons, defBtn, options);
+}
+
+RetVal<Val> InteractiveProvider::info(const std::string& title, const std::string& text, const IInteractive::ButtonDatas& buttons,
+                                      int defBtn,
+                                      const framework::IInteractive::Options& options)
+{
+    return openStandardDialog("INFO", QString::fromStdString(title), text, buttons, defBtn, options);
+}
+
+RetVal<Val> InteractiveProvider::warning(const std::string& title, const std::string& text, const IInteractive::ButtonDatas& buttons,
+                                         int defBtn,
+                                         const framework::IInteractive::Options& options)
+{
+    return openStandardDialog("WARNING", QString::fromStdString(title), text, buttons, defBtn, options);
+}
+
+RetVal<Val> InteractiveProvider::error(const std::string& title, const std::string& text, const IInteractive::ButtonDatas& buttons,
+                                       int defBtn,
+                                       const framework::IInteractive::Options& options)
+{
+    return openStandardDialog("ERROR", QString::fromStdString(title), text, buttons, defBtn, options);
 }
 
 RetVal<Val> InteractiveProvider::open(const UriQuery& q)
@@ -70,6 +104,39 @@ RetVal<Val> InteractiveProvider::open(const UriQuery& q)
     return returnedRV;
 }
 
+RetVal<bool> InteractiveProvider::isOpened(const Uri& uri) const
+{
+    for (const ObjectInfo& objectInfo: m_stack) {
+        if (objectInfo.uriQuery.uri() == uri) {
+            return RetVal<bool>::make_ok(true);
+        }
+    }
+
+    return RetVal<bool>::make_ok(false);
+}
+
+void InteractiveProvider::close(const Uri& uri)
+{
+    for (const ObjectInfo& objectInfo: m_stack) {
+        if (objectInfo.uriQuery.uri() != uri) {
+            continue;
+        }
+
+        ContainerMeta openMeta = uriRegister()->meta(objectInfo.uriQuery.uri());
+        switch (openMeta.type) {
+        case ContainerType::QWidgetDialog:
+            closeWidgetDialog(objectInfo.objectId);
+            break;
+        case ContainerType::QmlDialog:
+            closeQml(objectInfo.objectId);
+            break;
+        case ContainerType::PrimaryPage:
+        case ContainerType::Undefined:
+            break;
+        }
+    }
+}
+
 void InteractiveProvider::fillData(QmlLaunchData* data, const UriQuery& q) const
 {
     ContainerMeta meta = uriRegister()->meta(q.uri());
@@ -103,15 +170,57 @@ void InteractiveProvider::fillData(QObject* object, const UriQuery& q) const
             object->setProperty(metaProperty.name(), params[metaProperty.name()]);
         }
     }
+}
 
-    object->setParent(mainWindow()->qMainWindow());
+void InteractiveProvider::fillStandatdDialogData(QmlLaunchData* data, const QString& type, const QString& title,
+                                                 const IInteractive::Text& text, const IInteractive::ButtonDatas& buttons, int defBtn,
+                                                 const IInteractive::Options& options) const
+{
+    auto format = [](IInteractive::TextFormat f) {
+        switch (f) {
+        case IInteractive::TextFormat::PlainText: return Qt::PlainText;
+        case IInteractive::TextFormat::RichText:  return Qt::RichText;
+        }
+        return Qt::PlainText;
+    };
+
+    QVariantMap params;
+    params["type"] = type;
+    params["title"] = title;
+    params["text"] = QString::fromStdString(text.text);
+    params["textFormat"] = format(text.format);
+    params["defaultButtonId"] = defBtn;
+
+    QVariantList buttonList;
+    for (const IInteractive::ButtonData& buttonData: buttons) {
+        QVariantMap buttonObj;
+        buttonObj["buttonId"] = QVariant::fromValue(buttonData.btn);
+        buttonObj["title"] = QVariant::fromValue(QString::fromStdString(buttonData.text));
+        buttonObj["accent"] = QVariant::fromValue(buttonData.accent);
+
+        buttonList << buttonObj;
+    }
+
+    if (!buttonList.empty()) {
+        params["buttons"] = buttonList;
+    }
+
+    if (options.testFlag(framework::IInteractive::Option::WithIcon)) {
+        params["withIcon"] = true;
+    }
+
+    if (options.testFlag(framework::IInteractive::Option::WithShowAgain)) {
+        params["withShowAgain"] = true;
+    }
+
+    data->setValue("params", params);
 }
 
 ValCh<Uri> InteractiveProvider::currentUri() const
 {
     ValCh<Uri> v;
     if (!m_stack.empty()) {
-        v.val = m_stack.last().uri();
+        v.val = m_stack.last().uriQuery.uri();
     }
     v.ch = m_currentUriChanged;
     return v;
@@ -130,7 +239,7 @@ QString InteractiveProvider::objectID(const QVariant& val) const
             return QString();
         }
 
-        objectID = QString(obj->metaObject()->className()) + "_" + QString::number(count);
+        objectID = QString(obj->metaObject()->className());
     } else {
         objectID = "unknown_" + QString::number(count);
     }
@@ -212,7 +321,7 @@ RetVal<InteractiveProvider::OpenData> InteractiveProvider::openWidgetDialog(cons
         dialog->deleteLater();
     });
 
-    onOpen(ContainerType::QWidgetDialog);
+    onOpen(ContainerType::QWidgetDialog, widgetMetaTypeId);
 
     bool sync = q.param("sync", Val(false)).toBool();
     if (sync) {
@@ -244,7 +353,59 @@ RetVal<InteractiveProvider::OpenData> InteractiveProvider::openQml(const UriQuer
     return result;
 }
 
-void InteractiveProvider::onOpen(const QVariant& type)
+RetVal<Val> InteractiveProvider::openStandardDialog(const QString& type, const QString& title, const framework::IInteractive::Text& text,
+                                                    const framework::IInteractive::ButtonDatas& buttons, int defBtn,
+                                                    const framework::IInteractive::Options& options)
+{
+    QmlLaunchData* data = new QmlLaunchData();
+    fillStandatdDialogData(data, type, title, text, buttons, defBtn, options);
+
+    emit fireOpenStandardDialog(data);
+
+    Ret ret = toRet(data->value("ret"));
+    QString objectID = data->value("objectID").toString();
+
+    delete data;
+
+    RetVal<Val> result;
+    if (!ret) {
+        result.ret = ret;
+        return result;
+    }
+
+    if (!objectID.isEmpty()) {
+        RetVal<Val> rv = m_retvals.take(objectID);
+        if (rv.ret.valid()) {
+            result = rv;
+        }
+    }
+
+    return result;
+}
+
+void InteractiveProvider::closeWidgetDialog(const QVariant& dialogMetaTypeId)
+{
+    const QWindow* window = mainWindow()->qWindow();
+    if (!window) {
+        return;
+    }
+
+    int _dialogMetaTypeId = dialogMetaTypeId.toInt();
+
+    for (QObject* object : window->children()) {
+        WidgetDialog* dialog = dynamic_cast<WidgetDialog*>(object);
+        if (dialog && dialog->metaTypeId() == _dialogMetaTypeId) {
+            dialog->close();
+        }
+    }
+}
+
+void InteractiveProvider::closeQml(const QVariant& objectID)
+{
+    emit fireClose(objectID);
+}
+
+void InteractiveProvider::onOpen(const QVariant& type, const QVariant& objectId)
 {
     ContainerType::Type containerType = type.value<ContainerType::Type>();
 
@@ -252,16 +413,20 @@ void InteractiveProvider::onOpen(const QVariant& type)
         containerType = ContainerType::QmlDialog;
     }
 
+    ObjectInfo objectInfo;
+    objectInfo.uriQuery = m_openingUriQuery;
+    objectInfo.objectId = objectId;
+
     if (ContainerType::PrimaryPage == containerType) {
         m_stack.clear();
-        m_stack.push(m_openingUriQuery);
+        m_stack.push(objectInfo);
     } else if (ContainerType::QmlDialog == containerType) {
-        m_stack.push(m_openingUriQuery);
+        m_stack.push(objectInfo);
     } else if (ContainerType::QWidgetDialog == containerType) {
-        m_stack.push(m_openingUriQuery);
+        m_stack.push(objectInfo);
     } else {
         IF_ASSERT_FAILED_X(false, "unknown page type") {
-            m_stack.push(m_openingUriQuery);
+            m_stack.push(objectInfo);
         }
     }
 

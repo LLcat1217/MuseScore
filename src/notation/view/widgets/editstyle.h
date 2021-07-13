@@ -1,25 +1,26 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_NOTATION_EDITSTYLE_H
 #define MU_NOTATION_EDITSTYLE_H
-
-#include <QScrollArea>
 
 #include "ui_editstyle.h"
 #include "modularity/ioc.h"
@@ -27,34 +28,7 @@
 #include "inotationconfiguration.h"
 #include "iinteractive.h"
 
-namespace mu {
-namespace notation {
-class Score;
-class EditStyle;
-
-//---------------------------------------------------------
-//   StyleWidget
-//---------------------------------------------------------
-
-struct StyleWidget {
-    StyleId idx;
-    bool showPercent;
-    QObject* widget;
-    QToolButton* reset;
-};
-
-//---------------------------------------------------------
-//   EditStylePage
-///   This is a type for a pointer to any QWidget that is a member of EditStyle.
-///   It's used to create static references to the pointers to pages.
-//---------------------------------------------------------
-
-typedef QWidget* EditStyle::* EditStylePage;
-
-//---------------------------------------------------------
-//   EditStyle
-//---------------------------------------------------------
-
+namespace mu::notation {
 class EditStyle : public QDialog, private Ui::EditStyleBase
 {
     Q_OBJECT
@@ -63,14 +37,50 @@ class EditStyle : public QDialog, private Ui::EditStyleBase
     INJECT(notation, mu::notation::INotationConfiguration, configuration)
     INJECT(notation, mu::framework::IInteractive, interactive)
 
-    QPushButton* buttonApplyToAllParts = nullptr;
-    QScrollArea* scrollArea = nullptr;
-    QVector<StyleWidget> styleWidgets;
-    bool isTooBig = false;
-    bool hasShown = false;
+public:
+    EditStyle(QWidget* = nullptr);
+    EditStyle(const EditStyle&);
 
-    virtual void showEvent(QShowEvent*);
-    virtual void hideEvent(QHideEvent*);
+    void setPage(int idx);
+    void gotoElement(Element* e);
+    static bool elementHasPage(Element* e);
+
+public slots:
+    void accept();
+    void reject();
+
+private:
+    void showEvent(QShowEvent*);
+    void hideEvent(QHideEvent*);
+    void changeEvent(QEvent*);
+
+    void retranslate();
+    void setHeaderFooterToolTip();
+    void adjustPagesStackSize(int currentPageIndex);
+
+    /// EditStylePage
+    /// This is a type for a pointer to any QWidget that is a member of EditStyle.
+    /// It's used to create static references to the pointers to pages.
+    typedef QWidget* EditStyle::* EditStylePage;
+    static EditStylePage pageForElement(Element*);
+
+    struct StyleWidget {
+        StyleId idx;
+        bool showPercent;
+        QObject* widget;
+        QToolButton* reset;
+    };
+
+    QVector<StyleWidget> styleWidgets;
+    const StyleWidget& styleWidget(StyleId id) const;
+
+    std::vector<QComboBox*> lineStyleComboBoxes;
+    std::vector<QComboBox*> verticalPlacementComboBoxes;
+    std::vector<QComboBox*> horizontalPlacementComboBoxes;
+
+    QPushButton* buttonApplyToAllParts = nullptr;
+
+    void unhandledType(const StyleWidget);
     QVariant getValue(StyleId idx);
     void setValues();
 
@@ -79,15 +89,15 @@ class EditStyle : public QDialog, private Ui::EditStyleBase
     bool hasDefaultStyleValue(StyleId id) const;
     void setStyleValue(StyleId id, const QVariant& value);
 
-    const StyleWidget& styleWidget(StyleId id) const;
-
-    void adjustPagesStackSize(int currentPageIndex);
-
-    static const std::map<ElementType, EditStylePage> PAGES;
+    int numberOfPage;
+    int pageListMap[50];
 
 private slots:
     void selectChordDescriptionFile();
     void setChordStyle(bool);
+    void enableStyleWidget(const StyleId idx, bool enable);
+    void enableVerticalSpreadClicked(bool);
+    void disableVerticalSpreadClicked(bool);
     void toggleHeaderOddEven(bool);
     void toggleFooterOddEven(bool);
     void buttonClicked(QAbstractButton*);
@@ -104,15 +114,17 @@ private slots:
     void textStyleValueChanged(Ms::Pid, QVariant);
     void on_comboFBFont_currentIndexChanged(int index);
     void on_buttonTogglePagelist_clicked();
+    void on_resetStylesButton_clicked();
     void editUserStyleName();
     void endEditUserStyleName();
     void resetUserStyleName();
-
-public:
-    EditStyle(QWidget* = nullptr);
-    EditStyle(const EditStyle&);
+    void pageListRowChanged(int);
+    void pageListResetOrder();
+    void pageListMoved(QModelIndex, int, int, QModelIndex, int);
+    void stringToArray(std::string, int*);
+    std::string arrayToString(int*);
+    std::string ConsecutiveStr(int);
 };
-}
 }
 
 Q_DECLARE_METATYPE(mu::notation::EditStyle)

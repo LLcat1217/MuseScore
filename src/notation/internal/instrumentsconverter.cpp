@@ -1,30 +1,34 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "instrumentsconverter.h"
 
 #include "libmscore/instrument.h"
+#include "libmscore/instrtemplate.h"
+#include "libmscore/drumset.h"
 
 using namespace mu::notation;
-using namespace mu::instruments;
 
-Ms::Instrument InstrumentsConverter::convertInstrument(const mu::instruments::Instrument& instrument)
+Ms::Instrument InstrumentsConverter::convertInstrument(const Instrument& instrument)
 {
     Ms::Instrument result;
     result.setAmateurPitchRange(instrument.amateurPitchRange.min, instrument.amateurPitchRange.max);
@@ -40,7 +44,8 @@ Ms::Instrument InstrumentsConverter::convertInstrument(const mu::instruments::In
 
     result.setTrackName(instrument.name);
     result.setTranspose(instrument.transpose);
-    result.setInstrumentId(instrument.id);
+    result.setId(instrument.id);
+    result.setInstrumentId(instrument.musicXMLid);
 
     if (instrument.useDrumset) {
         result.setDrumset(instrument.drumset ? instrument.drumset : Ms::smDrumset);
@@ -53,19 +58,22 @@ Ms::Instrument InstrumentsConverter::convertInstrument(const mu::instruments::In
     result.setMidiActions(convertMidiActions(instrument.midiActions));
     result.setArticulation(instrument.midiArticulations);
 
-    for (const instruments::Channel& channel : instrument.channels) {
-        result.appendChannel(new instruments::Channel(channel));
+    result.clearChannels();
+
+    for (const InstrumentChannel& channel : instrument.channels) {
+        result.appendChannel(new InstrumentChannel(channel));
     }
 
     result.setStringData(instrument.stringData);
     result.setSingleNoteDynamics(instrument.singleNoteDynamics);
+    result.setTrait(instrument.trait);
 
     return result;
 }
 
-mu::instruments::Instrument InstrumentsConverter::convertInstrument(const Ms::Instrument& instrument)
+Instrument InstrumentsConverter::convertInstrument(const Ms::Instrument& instrument)
 {
-    mu::instruments::Instrument result;
+    Instrument result;
     result.amateurPitchRange = PitchRange(instrument.minPitchA(), instrument.maxPitchA());
     result.professionalPitchRange = PitchRange(instrument.minPitchP(), instrument.maxPitchP());
 
@@ -79,10 +87,12 @@ mu::instruments::Instrument InstrumentsConverter::convertInstrument(const Ms::In
 
     result.name = instrument.trackName();
     result.transpose = instrument.transpose();
-    result.id = instrument.instrumentId();
+    result.id = instrument.getId();
+    result.musicXMLid = instrument.instrumentId();
     result.useDrumset = instrument.useDrumset();
     result.drumset = instrument.drumset();
 
+    result.staves = instrument.cleffTypeCount();
     for (int i = 0; i < instrument.cleffTypeCount(); ++i) {
         result.clefs[i] = instrument.clefType(i);
     }
@@ -90,12 +100,28 @@ mu::instruments::Instrument InstrumentsConverter::convertInstrument(const Ms::In
     result.midiActions = convertMidiActions(instrument.midiActions());
     result.midiArticulations = instrument.articulation();
 
-    for (const instruments::Channel* channel : instrument.channel()) {
+    for (const InstrumentChannel* channel : instrument.channel()) {
         result.channels.append(*channel);
     }
 
     result.stringData = *instrument.stringData();
     result.singleNoteDynamics = instrument.singleNoteDynamics();
+    result.trait = instrument.trait();
+
+    return result;
+}
+
+Instrument InstrumentsConverter::convertInstrument(const Ms::InstrumentTemplate& templ)
+{
+    Ms::Instrument msInstrument = Ms::Instrument::fromTemplate(&templ);
+    Instrument result = convertInstrument(msInstrument);
+    result.templateId = templ.id;
+    result.familyId = templ.family->id;
+    result.sequenceOrder = templ.sequenceOrder;
+
+    for (const Ms::InstrumentGenre* msGenre : templ.genres) {
+        result.genreIds << msGenre->id;
+    }
 
     return result;
 }

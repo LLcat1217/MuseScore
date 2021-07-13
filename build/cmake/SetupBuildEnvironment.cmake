@@ -53,6 +53,9 @@ elseif(CC_IS_MINGW)
         set(CMAKE_EXE_LINKER_FLAGS "-Wl,--large-address-aware")
     endif (NOT BUILD_64)
 
+    add_definitions(-D_UNICODE)
+    add_definitions(-DUNICODE)
+
 elseif(CC_IS_CLANG)
     message(STATUS "Using Compiler CLANG ${CMAKE_CXX_COMPILER_VERSION}")
 
@@ -64,7 +67,7 @@ elseif(CC_IS_EMSCRIPTEN)
 
     set(EMCC_CMAKE_TOOLCHAIN "" CACHE FILEPATH "Path to EMCC CMake Emscripten.cmake")
     set(EMCC_INCLUDE_PATH "." CACHE PATH "Path to EMCC include dir")
-    set(EMCC_COMPILE_FLAGS "--bind -o  .html")
+    set(EMCC_COMPILE_FLAGS "--bind -o .html --preload-file ../../files")
 
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/public_html)
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
@@ -73,7 +76,7 @@ elseif(CC_IS_EMSCRIPTEN)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
     #for QtCreator
-    include_directories(
+    include_directories(AFTER
         ${EMCC_INCLUDE_PATH}
         ${EMCC_INCLUDE_PATH}/libcxx
         ${EMCC_INCLUDE_PATH}/libc
@@ -98,7 +101,6 @@ else() #Release
 
     add_definitions(-DNDEBUG)
     add_definitions(-DQT_NO_DEBUG)
-    add_definitions(-DQT_NO_DEBUG_OUTPUT)
 
 endif()
 

@@ -1,14 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2002-2012 Werner Schweer
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENCE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "qmlpluginapi.h"
 #include "cursor.h"
@@ -22,6 +32,7 @@
 #include "tie.h"
 
 #include "libmscore/musescoreCore.h"
+#include "engraving/scoreaccess.h"
 
 #include <QQmlEngine>
 
@@ -178,7 +189,7 @@ Score* PluginAPI::newScore(const QString& name, const QString& part, int measure
     if (msc()->currentScore()) {
         msc()->currentScore()->endCmd();
     }
-    MasterScore* score = new MasterScore(MScore::defaultStyle());
+    MasterScore* score = mu::engraving::ScoreAccess::createMasterScore(MScore::defaultStyle());
     score->setName(name);
     score->appendPart(Score::instrTemplateFromName(part));
     score->appendMeasures(measures);
@@ -317,6 +328,7 @@ void PluginAPI::registerQmlTypes()
     qmlRegisterAnonymousType<Segment>("MuseScore", 3);
     qmlRegisterAnonymousType<Measure>("MuseScore", 3);
     qmlRegisterAnonymousType<Part>("MuseScore", 3);
+    qmlRegisterAnonymousType<Staff>("MuseScore", 3);
     qmlRegisterAnonymousType<Instrument>("MuseScore", 3);
     qmlRegisterAnonymousType<Channel>("MuseScore", 3);
     qmlRegisterAnonymousType<StringData>("MuseScore", 3);
@@ -362,6 +374,17 @@ void PluginAPI::registerQmlTypes()
     qRegisterMetaType<FractionWrapper*>("FractionWrapper*");
 
     qmlTypesRegistered = true;
+}
+
+MuseScoreCore* PluginAPI::msc() const
+{
+    static MuseScoreCore mscStatic;
+    if (this->context() && this->context()->currentNotation()) {
+        mscStatic.setCurrentScore(this->context()->currentNotation()->elements()->msScore());
+    } else {
+        mscStatic.setCurrentScore(0);
+    }
+    return &mscStatic;
 }
 }
 }

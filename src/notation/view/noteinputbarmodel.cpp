@@ -1,120 +1,80 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "noteinputbarmodel.h"
 
 #include "log.h"
-#include "ui/view/iconcodes.h"
-#include "internal/notationactions.h"
+#include "translation.h"
+
+#include "internal/notationuiactions.h"
 
 using namespace mu::notation;
 using namespace mu::actions;
-using namespace mu::workspace;
-using namespace mu::framework;
+using namespace mu::ui;
 
-static const std::string TOOLBAR_TAG("Toolbar");
-static const std::string TOOLBAR_NAME("noteInput");
+static const QString TOOLBAR_NAME("noteInput");
 
-static const std::string ADD_ACTION_NAME("add");
-static const std::string ADD_ACTION_TITLE("Add");
+static const std::string ADD_ACTION_CODE("add");
+static const char* ADD_ACTION_TITLE("Add");
 static const IconCode::Code ADD_ACTION_ICON_CODE = IconCode::Code::PLUS;
 
-static QList<mu::actions::ActionName> noteInputModeActionNames = {
-    { "note-input" },
-    { "note-input-rhythm" },
-    { "note-input-repitch" },
-    { "note-input-realtime-auto" },
-    { "note-input-realtime-manual" },
-    { "note-input-timewise" },
+static const ActionCode TUPLET_ACTION_CODE("tuplet");
+
+static const std::vector<std::pair<ActionCode, NoteInputMethod> > noteInputModeActions = {
+    { "note-input-steptime", NoteInputMethod::STEPTIME },
+    { "note-input-rhythm", NoteInputMethod::RHYTHM },
+    { "note-input-repitch", NoteInputMethod::REPITCH },
+    { "note-input-realtime-auto", NoteInputMethod::REALTIME_AUTO },
+    { "note-input-realtime-manual", NoteInputMethod::REALTIME_MANUAL },
+    { "note-input-timewise", NoteInputMethod::TIMEWISE },
 };
 
-NoteInputBarModel::NoteInputBarModel(QObject* parent)
-    : QAbstractListModel(parent)
+static NoteInputMethod noteInputMethodForActionCode(const ActionCode& code)
 {
-}
-
-QVariant NoteInputBarModel::data(const QModelIndex& index, int role) const
-{
-    const ActionItem& item = m_items.at(index.row());
-    switch (role) {
-    case IconRole: return static_cast<int>(item.action.iconCode);
-    case SectionRole: return item.section;
-    case NameRole: return QString::fromStdString(item.action.name);
-    case CheckedRole: return item.checked;
-    }
-    return QVariant();
-}
-
-int NoteInputBarModel::rowCount(const QModelIndex&) const
-{
-    return m_items.count();
-}
-
-QHash<int,QByteArray> NoteInputBarModel::roleNames() const
-{
-    static const QHash<int, QByteArray> roles = {
-        { IconRole, "iconRole" },
-        { SectionRole, "sectionRole" },
-        { NameRole, "nameRole" },
-        { CheckedRole, "checkedRole" }
-    };
-    return roles;
-}
-
-void NoteInputBarModel::load()
-{
-    m_items.clear();
-
-    beginResetModel();
-
-    std::vector<std::string> noteInputActions = currentWorkspaceActions();
-
-    int section = 0;
-    for (const std::string& actionName: noteInputActions) {
-        if (actionName.empty()) {
-            section++;
-            continue;
+    for (const auto& pair : noteInputModeActions) {
+        if (pair.first == code) {
+            return pair.second;
         }
-
-        m_items << makeActionItem(actionsRegister()->action(actionName), QString::number(section));
     }
 
-    m_items << makeAddItem(QString::number(++section));
+    return NoteInputMethod::UNKNOWN;
+}
 
-    endResetModel();
-
-    emit countChanged(rowCount());
-
-    RetValCh<IWorkspacePtr> workspace = workspaceManager()->currentWorkspace();
-
-    if (workspace.ret) {
-        workspace.ch.onReceive(this, [this](IWorkspacePtr) {
-            load();
-        });
-
-        workspace.val->dataChanged().onReceive(this, [this](const AbstractDataPtr data) {
-            if (data->name == TOOLBAR_NAME) {
-                load();
-            }
-        });
+static ActionCode actionCodeForNoteInputMethod(NoteInputMethod method)
+{
+    for (const auto& pair : noteInputModeActions) {
+        if (pair.second == method) {
+            return pair.first;
+        }
     }
 
-    onNotationChanged();
+    return {};
+}
+
+NoteInputBarModel::NoteInputBarModel(QObject* parent)
+    : AbstractMenuModel(parent)
+{
+    uiConfiguration()->toolConfigChanged(TOOLBAR_NAME).onNotify(this, [this]() {
+        load();
+    });
 
     context()->currentNotationChanged().onNotify(this, [this]() {
         onNotationChanged();
@@ -125,34 +85,87 @@ void NoteInputBarModel::load()
     });
 }
 
-NoteInputBarModel::ActionItem& NoteInputBarModel::item(const actions::ActionName& actionName)
+QVariant NoteInputBarModel::data(const QModelIndex& index, int role) const
 {
-    for (ActionItem& item : m_items) {
-        if (item.action.name == actionName) {
-            return item;
-        }
+    TRACEFUNC;
+    int row = index.row();
+
+    if (!isIndexValid(row)) {
+        return QVariant();
     }
 
-    static ActionItem null;
-    return null;
+    const MenuItem& item = items()[row];
+    switch (role) {
+    case SubitemsRole: return subitems(item.code);
+    case IsMenuSecondaryRole: return isMenuSecondary(item.code);
+    case OrderRole: return row;
+    default: return AbstractMenuModel::data(index, role);
+    }
+}
+
+QHash<int, QByteArray> NoteInputBarModel::roleNames() const
+{
+    QHash<int, QByteArray> roles = AbstractMenuModel::roleNames();
+    roles[IsMenuSecondaryRole] = "isMenuSecondary";
+    roles[OrderRole] = "order";
+
+    return roles;
+}
+
+void NoteInputBarModel::load()
+{
+    AbstractMenuModel::load();
+    MenuItemList items;
+
+    ToolConfig noteInputConfig = uiConfiguration()->toolConfig(TOOLBAR_NAME);
+    if (!noteInputConfig.isValid()) {
+        noteInputConfig = NotationUiActions::defaultNoteInputBarConfig();
+    }
+
+    int section = 0;
+    for (const ToolConfig::Item& citem : noteInputConfig.items) {
+        if (!citem.show) {
+            continue;
+        }
+
+        if (citem.action.empty()) {
+            section++;
+            continue;
+        }
+
+        MenuItem item = makeActionItem(uiactionsRegister()->action(citem.action), QString::number(section));
+        items << item;
+    }
+
+    items << makeAddItem(QString::number(++section));
+    setItems(items);
+
+    onNotationChanged();
+}
+
+void NoteInputBarModel::onActionsStateChanges(const actions::ActionCodeList& codes)
+{
+    UNUSED(codes);
+    notifyAboutTupletItemChanged();
+    notifyAboutAddItemChanged();
 }
 
 int NoteInputBarModel::findNoteInputModeItemIndex() const
 {
-    for (int i = 0; i < m_items.size(); i++) {
-        if (noteInputModeActionNames.contains(m_items[i].action.name)) {
+    const MenuItemList& items = this->items();
+
+    for (int i = 0; i < items.size(); i++) {
+        if (isNoteInputModeAction(items[i].code)) {
             return i;
         }
     }
 
-    return -1;
+    return INVALID_ITEM_INDEX;
 }
 
 void NoteInputBarModel::onNotationChanged()
 {
-    INotationPtr notation = context()->currentNotation();
-
-    if (notation) {
+    if (context()->currentNotation()) {
         noteInput()->stateChanged().onNotify(this, [this]() {
             updateState();
         });
@@ -169,33 +182,16 @@ void NoteInputBarModel::onNotationChanged()
     updateState();
 }
 
-void NoteInputBarModel::toggleNoteInput()
-{
-    if (!noteInput()) {
-        return;
-    }
-
-    if (isNoteInputMode()) {
-        noteInput()->endNoteInput();
-    } else {
-        noteInput()->startNoteInput();
-    }
-}
-
 void NoteInputBarModel::updateState()
 {
-    bool isPlaying = playbackController()->isPlaying();
-    if (!notation() || isPlaying) {
-        for (ActionItem& item : m_items) {
-            item.enabled = false;
-            item.checked = false;
-        }
-    } else {
-        for (ActionItem& item : m_items) {
-            item.enabled = true;
-            item.checked = false;
-        }
+    bool enabled = notation() && !playbackController()->isPlaying();
 
+    for (MenuItem& item : items()) {
+        item.state.enabled = enabled;
+        item.state.checked = false;
+    }
+
+    if (enabled) {
         updateNoteInputState();
     }
 
@@ -219,19 +215,23 @@ void NoteInputBarModel::updateNoteInputState()
 void NoteInputBarModel::updateNoteInputModeState()
 {
     int noteInputModeIndex = findNoteInputModeItemIndex();
-    if (noteInputModeIndex == -1) {
+    if (noteInputModeIndex == INVALID_ITEM_INDEX) {
         return;
     }
 
-    m_items[noteInputModeIndex].action = currentNoteInputModeAction();
-    m_items[noteInputModeIndex].checked = isNoteInputMode();
+    MenuItemList& items = this->items();
+    MenuItem& item = items[noteInputModeIndex];
+
+    QString currentSection = item.section;
+    item = makeActionItem(currentNoteInputModeAction(), currentSection);
+    item.state.checked = isNoteInputMode();
 
     emit dataChanged(index(noteInputModeIndex), index(noteInputModeIndex));
 }
 
 void NoteInputBarModel::updateNoteDotState()
 {
-    static std::vector<actions::ActionName> dotActions = {
+    static ActionCodeList dotActions = {
         "pad-dot",
         "pad-dotdot",
         "pad-dot3",
@@ -240,14 +240,14 @@ void NoteInputBarModel::updateNoteDotState()
 
     int durationDots = noteInputState().duration.dots();
 
-    for (const actions::ActionName& actionName: dotActions) {
-        item(actionName).checked = durationDots == NotationActions::actionDotCount(actionName);
+    for (const ActionCode& actionCode: dotActions) {
+        findItem(actionCode).state.checked = durationDots == NotationUiActions::actionDotCount(actionCode);
     }
 }
 
 void NoteInputBarModel::updateNoteDurationState()
 {
-    static std::vector<actions::ActionName> noteActions = {
+    static ActionCodeList noteActions = {
         "note-longa",
         "note-breve",
         "pad-note-1",
@@ -264,15 +264,14 @@ void NoteInputBarModel::updateNoteDurationState()
     };
 
     DurationType durationType = resolveCurrentDurationType();
-
-    for (const actions::ActionName& actionName: noteActions) {
-        item(actionName).checked = durationType == NotationActions::actionDurationType(actionName);
+    for (const ActionCode& actionCode: noteActions) {
+        findItem(actionCode).state.checked = durationType == NotationUiActions::actionDurationType(actionCode);
     }
 }
 
 void NoteInputBarModel::updateNoteAccidentalState()
 {
-    static std::vector<actions::ActionName> accidentalActions = {
+    static ActionCodeList accidentalActions = {
         "flat2",
         "flat",
         "nat",
@@ -282,13 +281,17 @@ void NoteInputBarModel::updateNoteAccidentalState()
 
     AccidentalType accidentalType = noteInputState().accidentalType;
 
-    for (const actions::ActionName& actionName: accidentalActions) {
-        item(actionName).checked = accidentalType == NotationActions::actionAccidentalType(actionName);
+    for (const ActionCode& actionCode: accidentalActions) {
+        findItem(actionCode).state.checked = accidentalType == NotationUiActions::actionAccidentalType(actionCode);
     }
 }
 
 void NoteInputBarModel::updateTieState()
 {
+    if (!selection()) {
+        return;
+    }
+
     std::vector<Note*> tiedNotes = selection()->notes(NoteFilter::WithTie);
 
     bool checked = !tiedNotes.empty();
@@ -299,17 +302,17 @@ void NoteInputBarModel::updateTieState()
         }
     }
 
-    item("tie").checked = checked;
+    findItem("tie").state.checked = checked;
 }
 
 void NoteInputBarModel::updateSlurState()
 {
-    item("add-slur").checked = noteInputState().withSlur;
+    findItem("add-slur").state.checked = resolveSlurSelected();
 }
 
 void NoteInputBarModel::updateVoicesState()
 {
-    static std::vector<actions::ActionName> voiceActions {
+    static ActionCodeList voiceActions {
         "voice-1",
         "voice-2",
         "voice-3",
@@ -318,14 +321,14 @@ void NoteInputBarModel::updateVoicesState()
 
     int currentVoice = resolveCurrentVoiceIndex();
 
-    for (const actions::ActionName& actionName: voiceActions) {
-        item(actionName).checked = currentVoice == NotationActions::actionVoice(actionName);
+    for (const ActionCode& actionCode: voiceActions) {
+        findItem(actionCode).state.checked = currentVoice == NotationUiActions::actionVoice(actionCode);
     }
 }
 
 void NoteInputBarModel::updateArticulationsState()
 {
-    static std::vector<actions::ActionName> articulationActions {
+    static ActionCodeList articulationActions {
         "add-marcato",
         "add-sforzato",
         "add-tenuto",
@@ -339,14 +342,14 @@ void NoteInputBarModel::updateArticulationsState()
                          articulationSymbolId) != currentArticulations.end();
     };
 
-    for (const actions::ActionName& actionName: articulationActions) {
-        item(actionName).checked = isArticulationSelected(NotationActions::actionArticulationSymbolId(actionName));
+    for (const ActionCode& actionCode: articulationActions) {
+        findItem(actionCode).state.checked = isArticulationSelected(NotationUiActions::actionArticulationSymbolId(actionCode));
     }
 }
 
 void NoteInputBarModel::updateRestState()
 {
-    item("pad-rest").checked = resolveRestSelected();
+    findItem("pad-rest").state.checked = resolveRestSelected();
 }
 
 int NoteInputBarModel::resolveCurrentVoiceIndex() const
@@ -485,82 +488,279 @@ DurationType NoteInputBarModel::resolveCurrentDurationType() const
     return result;
 }
 
-bool NoteInputBarModel::isNoteInputModeAction(const ActionName& actionName) const
+bool NoteInputBarModel::resolveSlurSelected() const
 {
-    return noteInputModeActionNames.contains(actionName);
+    if (!noteInput() || !selection()) {
+        return false;
+    }
+
+    if (isNoteInputMode()) {
+        return noteInputState().withSlur;
+    }
+
+    if (selection()->isNone() || selection()->isRange()) {
+        return false;
+    }
+
+    if (selection()->elements().empty()) {
+        return false;
+    }
+
+    for (const Element* element: selection()->elements()) {
+        const ChordRest* chordRest = elementToChordRest(element);
+        if (!chordRest) {
+            continue;
+        }
+
+        Ms::Slur* slur = chordRest->slur();
+        if (slur) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
-Action NoteInputBarModel::currentNoteInputModeAction() const
+bool NoteInputBarModel::isNoteInputModeAction(const ActionCode& actionCode) const
 {
-    static QMap<NoteInputMethod, actions::ActionName> noteInputActionNames = {
-        { NoteInputMethod::STEPTIME, "note-input" },
-        { NoteInputMethod::RHYTHM, "note-input-rhythm" },
-        { NoteInputMethod::REPITCH, "note-input-repitch" },
-        { NoteInputMethod::REALTIME_AUTO, "note-input-realtime-auto" },
-        { NoteInputMethod::REALTIME_MANUAL, "note-input-realtime-manual" },
-        { NoteInputMethod::TIMEWISE, "note-input-timewise" },
-    };
+    return actionCode == "note-input" || noteInputMethodForActionCode(actionCode) != NoteInputMethod::UNKNOWN;
+}
 
+UiAction NoteInputBarModel::currentNoteInputModeAction() const
+{
     NoteInputMethod method = noteInputState().method;
-    return actionsRegister()->action(noteInputActionNames[method]);
+    return uiactionsRegister()->action(actionCodeForNoteInputMethod(method));
 }
 
-NoteInputBarModel::ActionItem NoteInputBarModel::makeActionItem(const Action& action, const QString& section)
+MenuItem NoteInputBarModel::makeActionItem(const UiAction& action, const QString& section)
 {
-    ActionItem item;
-    item.action = action;
+    MenuItem item = action;
     item.section = section;
     return item;
 }
 
-NoteInputBarModel::ActionItem NoteInputBarModel::makeAddItem(const QString& section)
+MenuItem NoteInputBarModel::makeAddItem(const QString& section)
 {
-    Action addAction(ADD_ACTION_NAME, ADD_ACTION_TITLE, shortcuts::ShortcutContext::Undefined, ADD_ACTION_ICON_CODE);
+    UiAction addAction(ADD_ACTION_CODE, UiCtxAny, ADD_ACTION_TITLE, ADD_ACTION_ICON_CODE);
     return makeActionItem(addAction, section);
 }
 
-std::vector<std::string> NoteInputBarModel::currentWorkspaceActions() const
+QVariantList NoteInputBarModel::subitems(const ActionCode& actionCode) const
 {
-    RetValCh<IWorkspacePtr> workspace = workspaceManager()->currentWorkspace();
-    if (!workspace.ret) {
-        LOGE() << workspace.ret.toString();
-        return {};
+    MenuItemList items;
+    if (isNoteInputModeAction(actionCode)) {
+        items = noteInputMethodItems();
+    } else if (actionCode == TUPLET_ACTION_CODE) {
+        items = tupletItems();
+    } else if (actionCode == ADD_ACTION_CODE) {
+        items = addItems();
     }
 
-    AbstractDataPtr abstractData = workspace.val->data(WorkspaceTag::Toolbar, TOOLBAR_NAME);
-    ToolbarDataPtr toolbarData = std::dynamic_pointer_cast<ToolbarData>(abstractData);
-    if (!toolbarData) {
-        LOGE() << "Failed to get data of actions for " << TOOLBAR_NAME;
-        return {};
-    }
-
-    return toolbarData->actions;
-}
-
-void NoteInputBarModel::handleAction(const QString& action)
-{
-    if (isNoteInputModeAction(action.toStdString())) {
-        toggleNoteInput();
-        return;
-    }
-
-    dispatcher()->dispatch(actions::namefromQString(action));
-}
-
-QVariantMap NoteInputBarModel::get(int index)
-{
-    QVariantMap result;
-
-    QHash<int,QByteArray> names = roleNames();
-    QHashIterator<int, QByteArray> i(names);
-    while (i.hasNext()) {
-        i.next();
-        QModelIndex idx = this->index(index, 0);
-        QVariant data = idx.data(i.key());
-        result[i.value()] = data;
+    QVariantList result;
+    for (const MenuItem& item: items) {
+        result << item.toMap();
     }
 
     return result;
+}
+
+MenuItemList NoteInputBarModel::noteInputMethodItems() const
+{
+    MenuItemList items;
+    actions::ActionCode currentInputMethod = currentNoteInputModeAction().code;
+
+    for (const auto& pair : noteInputModeActions) {
+        ActionCode actionCode = pair.first;
+        MenuItem item = makeMenuItem(actionCode);
+        item.selectable = true;
+
+        if (actionCode == currentInputMethod) {
+            item.selected = true;
+        }
+
+        items.push_back(item);
+    }
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::tupletItems() const
+{
+    MenuItemList items = {
+        makeMenuItem("duplet"),
+        makeMenuItem("triplet"),
+        makeMenuItem("quadruplet"),
+        makeMenuItem("quintuplet"),
+        makeMenuItem("sextuplet"),
+        makeMenuItem("septuplet"),
+        makeMenuItem("octuplet"),
+        makeMenuItem("nonuplet"),
+        makeMenuItem("tuplet-dialog")
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::addItems() const
+{
+    MenuItemList items = {
+        makeMenu(qtrc("notation", "Notes"), notesItems()),
+        makeMenu(qtrc("notation", "Intervals"), intervalsItems()),
+        makeMenu(qtrc("notation", "Measures"), measuresItems()),
+        makeMenu(qtrc("notation", "Frames"), framesItems()),
+        makeMenu(qtrc("notation", "Text"), textItems()),
+        makeMenu(qtrc("notation", "Lines"), linesItems())
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::notesItems() const
+{
+    MenuItemList items {
+        makeMenuItem("note-c"),
+        makeMenuItem("note-d"),
+        makeMenuItem("note-e"),
+        makeMenuItem("note-f"),
+        makeMenuItem("note-g"),
+        makeMenuItem("note-a"),
+        makeMenuItem("note-b"),
+        makeSeparator(),
+        makeMenuItem("chord-c"),
+        makeMenuItem("chord-d"),
+        makeMenuItem("chord-e"),
+        makeMenuItem("chord-f"),
+        makeMenuItem("chord-g"),
+        makeMenuItem("chord-a"),
+        makeMenuItem("chord-b")
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::intervalsItems() const
+{
+    MenuItemList items {
+        makeMenuItem("interval1"),
+        makeMenuItem("interval2"),
+        makeMenuItem("interval3"),
+        makeMenuItem("interval4"),
+        makeMenuItem("interval5"),
+        makeMenuItem("interval6"),
+        makeMenuItem("interval7"),
+        makeMenuItem("interval8"),
+        makeMenuItem("interval9"),
+        makeSeparator(),
+        makeMenuItem("interval-2"),
+        makeMenuItem("interval-3"),
+        makeMenuItem("interval-4"),
+        makeMenuItem("interval-5"),
+        makeMenuItem("interval-6"),
+        makeMenuItem("interval-7"),
+        makeMenuItem("interval-8"),
+        makeMenuItem("interval-9")
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::measuresItems() const
+{
+    MenuItemList items {
+        makeMenuItem("insert-measure"),
+        makeMenuItem("insert-measures"),
+        makeSeparator(),
+        makeMenuItem("append-measure"),
+        makeMenuItem("append-measures")
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::framesItems() const
+{
+    MenuItemList items {
+        makeMenuItem("insert-hbox"),
+        makeMenuItem("insert-vbox"),
+        makeMenuItem("insert-textframe"),
+        makeSeparator(),
+        makeMenuItem("append-hbox"),
+        makeMenuItem("append-vbox"),
+        makeMenuItem("append-textframe")
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::textItems() const
+{
+    MenuItemList items {
+        makeMenuItem("title-text"),
+        makeMenuItem("subtitle-text"),
+        makeMenuItem("composer-text"),
+        makeMenuItem("poet-text"),
+        makeMenuItem("part-text"),
+        makeSeparator(),
+        makeMenuItem("system-text"),
+        makeMenuItem("staff-text"),
+        makeMenuItem("expression-text"),
+        makeMenuItem("rehearsalmark-text"),
+        makeMenuItem("instrument-change-text"),
+        makeMenuItem("fingering-text"),
+        makeSeparator(),
+        makeMenuItem("sticking-text"),
+        makeMenuItem("chord-text"),
+        makeMenuItem("roman-numeral-text"),
+        makeMenuItem("nashville-number-text"),
+        makeMenuItem("lyrics"),
+        makeMenuItem("figured-bass"),
+        makeMenuItem("tempo")
+    };
+
+    return items;
+}
+
+MenuItemList NoteInputBarModel::linesItems() const
+{
+    MenuItemList items {
+        makeMenuItem("add-slur"),
+        makeMenuItem("add-hairpin"),
+        makeMenuItem("add-hairpin-reverse"),
+        makeMenuItem("add-8va"),
+        makeMenuItem("add-8vb"),
+        makeMenuItem("add-noteline")
+    };
+
+    return items;
+}
+
+bool NoteInputBarModel::isMenuSecondary(const ActionCode& actionCode) const
+{
+    if (isNoteInputModeAction(actionCode)) {
+        return true;
+    }
+
+    return false;
+}
+
+void NoteInputBarModel::notifyAboutTupletItemChanged()
+{
+    int tupletItemIndex = itemIndex(TUPLET_ACTION_CODE);
+    if (tupletItemIndex == INVALID_ITEM_INDEX) {
+        return;
+    }
+
+    emit dataChanged(index(tupletItemIndex), index(tupletItemIndex));
+}
+
+void NoteInputBarModel::notifyAboutAddItemChanged()
+{
+    int addItemIndex = itemIndex(ADD_ACTION_CODE);
+    if (addItemIndex == INVALID_ITEM_INDEX) {
+        return;
+    }
+
+    emit dataChanged(index(addItemIndex), index(addItemIndex));
 }
 
 INotationPtr NoteInputBarModel::notation() const

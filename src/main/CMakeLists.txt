@@ -1,21 +1,22 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2019 MuseScore BVBA
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ###########################################
 # Setup main application
@@ -74,7 +75,7 @@ elseif(OS_IS_MAC)
     set(MACOSX_BUNDLE_LONG_VERSION_STRING ${MUSESCORE_VERSION_FULL})
     set(MACOSX_BUNDLE_SHORT_VERSION_STRING ${MUSESCORE_VERSION})
     set(MACOSX_BUNDLE_BUNDLE_VERSION ${MUSESCORE_VERSION_FULL})
-    set(MACOSX_BUNDLE_COPYRIGHT musescore.org)
+    set(MACOSX_BUNDLE_COPYRIGHT "Copyright © 1999-2021 MuseScore BVBA and others. Published under the GNU General Public License.")
     set(MACOSX_BUNDLE_SHORT_VERSION_STRING ${MUSESCORE_VERSION_FULL}.${CMAKE_BUILD_NUMBER})
     set(MACOSX_BUNDLE_BUNDLE_VERSION ${MUSESCORE_VERSION_FULL}.${CMAKE_BUILD_NUMBER})
 
@@ -97,7 +98,6 @@ elseif(OS_IS_WASM)
         -s USE_WEBGL2=1 \
         -s USE_ZLIB=1 \
         -s EXIT_RUNTIME=1 \
-        -s ERROR_ON_UNDEFINED_SYMBOLS=1 \
         -s \"EXTRA_EXPORTED_RUNTIME_METHODS=['UTF16ToString', 'stringToUTF16']\" \
         --bind \
         -s FETCH=1 \
@@ -105,14 +105,14 @@ elseif(OS_IS_WASM)
         -g \
         -s ASSERTIONS=2 \
         -s DEMANGLE_SUPPORT=1 \
-        -s GL_DEBUG=1 \
+        -s GL_DEBUG=0 \
         -s ALLOW_MEMORY_GROWTH=1 \
-        -s EXIT_RUNTIME=1 \
         -s TOTAL_MEMORY=33554432 \
         -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+        -O3 \
     ")
 else()
-    message(FATAL_ERROR "Unsopported Platform: ${CMAKE_HOST_SYSTEM_NAME}")
+    message(FATAL_ERROR "Unsupported Platform: ${CMAKE_HOST_SYSTEM_NAME}")
 endif()
 
 ###########################################
@@ -127,7 +127,6 @@ else (USE_SYSTEM_FREETYPE)
 endif (USE_SYSTEM_FREETYPE)
 
 set(LINK_LIB
-    ${FREETYPE_LIB}
     ${QT_LIBRARIES}
     global
     ui
@@ -142,8 +141,9 @@ if (BUILD_TELEMETRY_MODULE)
 endif(BUILD_TELEMETRY_MODULE)
 
 set(LINK_LIB ${LINK_LIB}
-    libmscore
+    engraving
     actions
+    accessibility
     appshell
     context
     shortcuts
@@ -152,6 +152,7 @@ set(LINK_LIB ${LINK_LIB}
     midi
     midi_old
     userscores
+    learn
     notation
     commonscene
     palette
@@ -162,11 +163,29 @@ set(LINK_LIB ${LINK_LIB}
     )
 
 if (NOT CC_IS_EMSCRIPTEN)
+    list(APPEND LINK_LIB ${FREETYPE_LIB})
     list(APPEND LINK_LIB cloud)
     list(APPEND LINK_LIB extensions)
     list(APPEND LINK_LIB languages)
-    list(APPEND LINK_LIB importexport)
+    list(APPEND LINK_LIB iex_musicxml)
+    list(APPEND LINK_LIB iex_bb)
+    list(APPEND LINK_LIB iex_braille)
+    list(APPEND LINK_LIB iex_bww)
+    list(APPEND LINK_LIB iex_capella)
+    list(APPEND LINK_LIB iex_guitarpro)
+    list(APPEND LINK_LIB iex_midi)
+    list(APPEND LINK_LIB iex_musedata)
+    list(APPEND LINK_LIB iex_ove)
+    list(APPEND LINK_LIB iex_audioexport)
+    list(APPEND LINK_LIB iex_imagesexport)
     list(APPEND LINK_LIB plugins)
+    list(APPEND LINK_LIB multiinstances)
+endif()
+
+list(APPEND LINK_LIB diagnostics)
+
+if (BUILD_AUTOBOT_MODULE)
+    list(APPEND LINK_LIB autobot)
 endif()
 
 if (BUILD_VST)
@@ -181,9 +200,8 @@ if (CC_IS_EMSCRIPTEN)
         list(APPEND MSCORE_APPEND_SRC $<TARGET_OBJECTS:${link}>)
     endforeach()
 
-    list(APPEND MSCORE_APPEND_SRC $<TARGET_OBJECTS:awl>)
     list(APPEND MSCORE_APPEND_SRC $<TARGET_OBJECTS:qzip>)
-    list(APPEND MSCORE_APPEND_SRC $<TARGET_OBJECTS:audiofile>)
+    list(APPEND MSCORE_APPEND_SRC $<TARGET_OBJECTS:sndfile>)
     list(APPEND MSCORE_APPEND_SRC $<TARGET_OBJECTS:fluidsynth>)
 endif()
 
@@ -232,8 +250,6 @@ else (MSCORE_OUTPUT_NAME)
     set(MSCORE_EXECUTABLE_NAME ${EXECUTABLE_NAME})
 endif (MSCORE_OUTPUT_NAME)
 set(MSCORE_EXECUTABLE_NAME "${MSCORE_EXECUTABLE_NAME}" PARENT_SCOPE)
-
-add_dependencies(mscore workspaces)
 
 ###########################################
 # Link
@@ -333,26 +349,6 @@ if (OS_IS_WIN)
             REGEX ".*QtWebkit.*" EXCLUDE
             )
 
-    if (USE_WEBENGINE)
-        install(FILES
-                ${QT_INSTALL_BINS}/Qt5WebEngineWidgets.dll
-                ${QT_INSTALL_BINS}/Qt5WebEngineCore.dll
-                DESTINATION bin)
-
-        install(FILES
-               ${QT_INSTALL_LIBEXECS}/QtWebEngineProcess.exe
-               DESTINATION bin)
-
-        install(DIRECTORY
-               ${QT_INSTALL_DATA}/resources
-               DESTINATION bin/webengineresources)
-
-        install(DIRECTORY
-               ${QT_INSTALL_TRANSLATIONS}/qtwebengine_locales
-               DESTINATION bin/webengineresources/translations)
-
-    endif(USE_WEBENGINE)
-
     if (SNDFILE_LIB)
         install(FILES ${DEPENDENCIES_DIR}/libsndfile-1.dll DESTINATION bin)
     endif()
@@ -444,24 +440,29 @@ elseif(OS_IS_MAC)
     install(FILES "${PROJECT_SOURCE_DIR}/src/main/res/musescoreDocument.icns" DESTINATION ${Mscore_SHARE_NAME}${Mscore_INSTALL_NAME})
 
     install(FILES
-            ${PROJECT_SOURCE_DIR}/fonts/gootville/GootvilleText.otf
-            ${PROJECT_SOURCE_DIR}/fonts/mscore/MScoreText.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/mscore/MusescoreIcon.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/musejazz/MuseJazzText.otf
+            ${PROJECT_SOURCE_DIR}/fonts/bravura/BravuraText.otf
             ${PROJECT_SOURCE_DIR}/fonts/campania/Campania.otf
+            ${PROJECT_SOURCE_DIR}/fonts/edwin/Edwin-BdIta.otf
+            ${PROJECT_SOURCE_DIR}/fonts/edwin/Edwin-Bold.otf
+            ${PROJECT_SOURCE_DIR}/fonts/edwin/Edwin-Italic.otf
+            ${PROJECT_SOURCE_DIR}/fonts/edwin/Edwin-Roman.otf
+            ${PROJECT_SOURCE_DIR}/fonts/firasans/FiraSans-Regular.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/firasans/FiraSans-SemiBold.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/gootville/GootvilleText.otf
+            ${PROJECT_SOURCE_DIR}/fonts/FreeSans.ttf
             ${PROJECT_SOURCE_DIR}/fonts/FreeSerif.ttf
             ${PROJECT_SOURCE_DIR}/fonts/FreeSerifBold.ttf
             ${PROJECT_SOURCE_DIR}/fonts/FreeSerifItalic.ttf
             ${PROJECT_SOURCE_DIR}/fonts/FreeSerifBoldItalic.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/FreeSans.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/mscoreTab.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/mscore-BC.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/bravura/BravuraText.otf
             ${PROJECT_SOURCE_DIR}/fonts/leland/Leland.otf
-            ${PROJECT_SOURCE_DIR}/fonts/petaluma/PetalumaText.otf
+            ${PROJECT_SOURCE_DIR}/fonts/leland/LelandText.otf
+            ${PROJECT_SOURCE_DIR}/fonts/mscore-BC.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/mscoreTab.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/mscore/MScoreText.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/mscore/MusescoreIcon.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/musejazz/MuseJazzText.otf
             ${PROJECT_SOURCE_DIR}/fonts/petaluma/PetalumaScript.otf
-            ${PROJECT_SOURCE_DIR}/fonts/firasans/FiraSans-Regular.ttf
-            ${PROJECT_SOURCE_DIR}/fonts/firasans/FiraSans-SemiBold.ttf
+            ${PROJECT_SOURCE_DIR}/fonts/petaluma/PetalumaText.otf
             DESTINATION ${Mscore_SHARE_NAME}${Mscore_INSTALL_NAME}fonts
     )
 
@@ -490,7 +491,7 @@ elseif(OS_IS_WASM)
     copy_html_js_launch_files(mscore)
 
 else()
-    message(FATAL_ERROR "Unsopported Platform: ${CMAKE_HOST_SYSTEM_NAME}")
+    message(FATAL_ERROR "Unsupported Platform: ${CMAKE_HOST_SYSTEM_NAME}")
 endif()
 
 

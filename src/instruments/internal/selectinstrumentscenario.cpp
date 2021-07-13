@@ -1,31 +1,35 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FIT-0NESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "selectinstrumentscenario.h"
 
 using namespace mu::instruments;
 using namespace mu::notation;
 
-mu::RetVal<InstrumentList> SelectInstrumentsScenario::selectInstruments(SelectInstrumentsMode mode) const
+mu::RetVal<PartInstrumentListScoreOrder> SelectInstrumentsScenario::selectInstruments(SelectInstrumentsMode mode) const
 {
     QStringList params;
     if (mode == SelectInstrumentsMode::ShowCurrentInstruments) {
-        params << "initiallySelectedInstrumentIds=" + partsInstrumentIds().join(",");
+        params << "initiallySelectedPartIds=" + partsIds().join(",");
+        params << "currentScoreOrderId=" + scoreOrder().id;
     }
 
     return selectInstruments(params);
@@ -40,7 +44,7 @@ mu::RetVal<Instrument> SelectInstrumentsScenario::selectInstrument(const std::st
         "currentInstrumentId=" + QString::fromStdString(currentInstrumentId)
     };
 
-    RetVal<InstrumentList> selectedInstruments = selectInstruments(params);
+    RetVal<PartInstrumentListScoreOrder> selectedInstruments = selectInstruments(params);
     if (!selectedInstruments.ret) {
         result.ret = selectedInstruments.ret;
         return result;
@@ -48,17 +52,17 @@ mu::RetVal<Instrument> SelectInstrumentsScenario::selectInstrument(const std::st
 
     result.ret = make_ret(Ret::Code::Ok);
 
-    if (selectedInstruments.val.empty()) {
+    if (selectedInstruments.val.instruments.empty()) {
         return result;
     }
 
-    result.val = selectedInstruments.val.first();
+    result.val = selectedInstruments.val.instruments.first().instrument;
     return result;
 }
 
-mu::RetVal<InstrumentList> SelectInstrumentsScenario::selectInstruments(const QStringList& params) const
+mu::RetVal<PartInstrumentListScoreOrder> SelectInstrumentsScenario::selectInstruments(const QStringList& params) const
 {
-    RetVal<InstrumentList> result;
+    RetVal<PartInstrumentListScoreOrder> result;
 
     QString uri = QString("musescore://instruments/select?%1").arg(params.join('&'));
     RetVal<Val> instruments = interactive()->open(uri.toStdString());
@@ -69,9 +73,19 @@ mu::RetVal<InstrumentList> SelectInstrumentsScenario::selectInstruments(const QS
 
     result.ret = make_ret(Ret::Code::Ok);
 
-    QVariantList objList = instruments.val.toQVariant().toList();
-    for (const QVariant& obj: objList) {
-        result.val << obj.value<Instrument>();
+    QVariantMap info = instruments.val.toQVariant().toMap();
+    result.val.scoreOrder = info["scoreOrder"].value<ScoreOrder>();
+
+    for (const QVariant& obj: info["instrumentList"].toList()) {
+        QVariantMap map = obj.toMap();
+        PartInstrument pi;
+
+        pi.isExistingPart = map["isExistingPart"].toBool();
+        pi.isSoloist = map["isSoloist"].toBool();
+        pi.partId = map["id"].toString();
+        pi.instrument = map["instrument"].value<Instrument>();
+
+        result.val.instruments << pi;
     }
 
     return result;
@@ -87,7 +101,7 @@ INotationPartsPtr SelectInstrumentsScenario::notationParts() const
     return notation->parts();
 }
 
-IDList SelectInstrumentsScenario::partsInstrumentIds() const
+IDList SelectInstrumentsScenario::partsIds() const
 {
     auto _notationParts = notationParts();
     if (!_notationParts) {
@@ -98,16 +112,18 @@ IDList SelectInstrumentsScenario::partsInstrumentIds() const
 
     IDList result;
     for (const Part* part: parts) {
-        async::NotifyList<Instrument> selectedInstruments = _notationParts->instrumentList(part->id());
-
-        for (const Instrument& instrument: selectedInstruments) {
-            if (part->isDoublingInstrument(instrument.id)) {
-                continue;
-            }
-
-            result << instrument.id;
-        }
+        result << part->id();
     }
 
     return result;
+}
+
+ScoreOrder SelectInstrumentsScenario::scoreOrder() const
+{
+    auto notation = globalContext()->currentNotation();
+    if (!notation) {
+        return ScoreOrder();
+    }
+
+    return notation->scoreOrder();
 }

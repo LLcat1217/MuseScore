@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "notationnoteinput.h"
 
 #include "libmscore/score.h"
@@ -66,6 +69,7 @@ NoteInputState NotationNoteInput::state() const
     noteInputState.articulationIds = articulationIds();
     noteInputState.withSlur = inputState.slur() != nullptr;
     noteInputState.currentVoiceIndex = inputState.voice();
+    noteInputState.isRest = inputState.rest();
 
     return noteInputState;
 }
@@ -87,10 +91,10 @@ void NotationNoteInput::startNoteInput()
         // if no note/rest is selected, start with voice 0
         int track = is.track() == -1 ? 0 : (is.track() / VOICES) * VOICES;
         // try to find an appropriate measure to start in
-        Fraction tick = el ? el->tick() : Fraction(0,1);
+        Fraction tick = el ? el->tick() : Fraction(0, 1);
         el = score()->searchNote(tick, track);
         if (!el) {
-            el = score()->searchNote(Fraction(0,1), track);
+            el = score()->searchNote(Fraction(0, 1), track);
         }
     }
 
@@ -108,13 +112,18 @@ void NotationNoteInput::startNoteInput()
     }
     //! ---
 
+    m_interaction->select({ el }, SelectType::SINGLE, 0);
+
+    // Not strictly necessary, just for safety
+    if (is.noteEntryMethod() == Ms::NoteEntryMethod::UNKNOWN) {
+        is.setNoteEntryMethod(Ms::NoteEntryMethod::STEPTIME);
+    }
+
     Duration d(is.duration());
     if (!d.isValid() || d.isZero() || d.type() == Duration::DurationType::V_MEASURE) {
         is.setDuration(Duration(Duration::DurationType::V_QUARTER));
     }
     is.setAccidentalType(Ms::AccidentalType::NONE);
-
-    score()->select(el, SelectType::SINGLE, 0);
 
     is.setRest(false);
     is.setNoteEntryMode(true);
@@ -170,8 +179,7 @@ void NotationNoteInput::toggleNoteInputMethod(NoteInputMethod method)
 
 void NotationNoteInput::addNote(NoteName noteName, NoteAddingMode addingMode)
 {
-    Ms::EditData editData;
-    editData.view = m_scoreCallbacks;
+    Ms::EditData editData(m_scoreCallbacks);
 
     startEdit();
     int inote = static_cast<int>(noteName);
@@ -185,11 +193,10 @@ void NotationNoteInput::addNote(NoteName noteName, NoteAddingMode addingMode)
 
 void NotationNoteInput::padNote(const Pad& pad)
 {
-    Ms::EditData ed;
-    ed.view = m_scoreCallbacks;
+    Ms::EditData editData(m_scoreCallbacks);
 
     startEdit();
-    score()->padToggle(pad, ed);
+    score()->padToggle(pad, editData);
     apply();
 
     notifyAboutStateChanged();
@@ -198,16 +205,15 @@ void NotationNoteInput::padNote(const Pad& pad)
 void NotationNoteInput::putNote(const QPointF& pos, bool replace, bool insert)
 {
     startEdit();
-    score()->putNote(pos, replace, insert);
+    score()->putNote(PointF::fromQPointF(pos), replace, insert);
     apply();
 
     notifyNoteAddedChanged();
 }
 
-void NotationNoteInput::toogleAccidental(AccidentalType accidentalType)
+void NotationNoteInput::setAccidental(AccidentalType accidentalType)
 {
-    Ms::EditData editData;
-    editData.view = m_scoreCallbacks;
+    Ms::EditData editData(m_scoreCallbacks);
 
     score()->toggleAccidental(accidentalType, editData);
 
@@ -232,9 +238,7 @@ void NotationNoteInput::setCurrentVoiceIndex(int voiceIndex)
     }
 
     Ms::InputState& inputState = score()->inputState();
-    int track = (inputState.track() / VOICES) * VOICES + voiceIndex;
-
-    inputState.setTrack(track);
+    inputState.setVoice(voiceIndex);
 
     if (inputState.segment()) {
         Ms::Segment* segment = inputState.segment()->measure()->first(Ms::SegmentType::ChordRest);
@@ -244,7 +248,7 @@ void NotationNoteInput::setCurrentVoiceIndex(int voiceIndex)
     notifyAboutStateChanged();
 }
 
-void NotationNoteInput::putTuplet(const TupletOptions& options)
+void NotationNoteInput::addTuplet(const TupletOptions& options)
 {
     Ms::InputState& inputState = score()->inputState();
 
@@ -288,7 +292,7 @@ QRectF NotationNoteInput::cursorRect() const
     constexpr int sideMargin = 4;
     constexpr int skylineMargin = 20;
 
-    QRectF segmentContentRect = segment->contentRect();
+    RectF segmentContentRect = segment->contentRect();
     double x = segmentContentRect.translated(segment->pagePos()).x() - sideMargin;
     double y = system->staffYpage(staffIdx) + system->page()->pos().y();
     double w = segmentContentRect.width() + 2 * sideMargin;
@@ -310,11 +314,16 @@ QRectF NotationNoteInput::cursorRect() const
         y -= skylineMargin;
     }
 
-    QRectF result = QRectF(x, y, w, h).translated(system->page()->pos());
-    return result;
+    RectF result = RectF(x, y, w, h);
+
+    if (configuration()->canvasOrientation().val == framework::Orientation::Horizontal) {
+        result.translate(system->page()->pos());
+    }
+
+    return result.toQRectF();
 }
 
-void NotationNoteInput::setSlur(Ms::Slur* slur)
+void NotationNoteInput::addSlur(Ms::Slur* slur)
 {
     Ms::InputState& inputState = score()->inputState();
     inputState.setSlur(slur);
@@ -322,7 +331,7 @@ void NotationNoteInput::setSlur(Ms::Slur* slur)
     if (slur) {
         std::vector<Ms::SpannerSegment*> slurSpannerSegments = slur->spannerSegments();
         if (!slurSpannerSegments.empty()) {
-            slurSpannerSegments.back()->setSelected(true);
+            slurSpannerSegments.front()->setSelected(true);
         }
     }
 
@@ -332,16 +341,25 @@ void NotationNoteInput::setSlur(Ms::Slur* slur)
 void NotationNoteInput::resetSlur()
 {
     Ms::InputState& inputState = score()->inputState();
-    if (!inputState.slur()) {
+    Ms::Slur* slur = inputState.slur();
+    if (!slur) {
         return;
     }
 
-    const std::vector<Ms::SpannerSegment*>& el = inputState.slur()->spannerSegments();
-    if (!el.empty()) {
-        el.front()->setSelected(false);
-    }
+    startEdit();
+    score()->removeElement(slur);
+    apply();
 
-    setSlur(nullptr);
+    addSlur(nullptr);
+}
+
+void NotationNoteInput::addTie()
+{
+    startEdit();
+    score()->cmdAddTie();
+    apply();
+
+    notifyAboutStateChanged();
 }
 
 Notification NotationNoteInput::noteAdded() const

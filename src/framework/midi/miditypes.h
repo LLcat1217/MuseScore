@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef MU_MIDI_MIDITYPES_H
 #define MU_MIDI_MIDITYPES_H
@@ -29,154 +32,101 @@
 #include <set>
 #include <cassert>
 #include "async/channel.h"
+#include "retval.h"
 #include "midievent.h"
 
-namespace mu {
-namespace midi {
-static const unsigned int AUDIO_CHANNELS = 2;
-
-using track_t = unsigned int;
-using program_t = unsigned int;
-using bank_t = unsigned int;
-using tick_t = int;
-using msec_t = uint64_t;
-using tempo_t = unsigned int;
+namespace mu::midi {
+using track_t = int32_t;
+using program_t = int32_t;
+using bank_t = int32_t;
+using tick_t = uint32_t;
+using tempo_t = uint32_t;
 using TempoMap = std::map<tick_t, tempo_t>;
 
 using SynthName = std::string;
-using SynthMap = std::map<channel_t, SynthName>;
-
-enum class SoundFontFormat {
-    Undefined = 0,
-    SF2,
-    SF3,
-    SFZ,
-};
-using SoundFontFormats = std::set<SoundFontFormat>;
-
-struct SynthesizerState {
-    enum class ValID {
-        UndefinedID = -1,
-        SoundFontID = 0,
-    };
-
-    struct Val {
-        ValID id = ValID::UndefinedID;
-        std::string val;
-        Val() = default;
-        Val(ValID id, const std::string& val)
-            : id(id), val(val) {}
-
-        bool operator ==(const Val& other) const { return other.id == id && other.val == val; }
-        bool operator !=(const Val& other) const { return !operator ==(other); }
-    };
-
-    struct Group {
-        std::string name;
-        std::vector<Val> vals;
-
-        bool isValid() const { return !name.empty(); }
-
-        bool operator ==(const Group& other) const { return other.name == name && other.vals == vals; }
-        bool operator !=(const Group& other) const { return !operator ==(other); }
-    };
-
-    std::map<std::string, Group> groups;
-
-    bool isNull() const { return groups.empty(); }
-};
+using SynthMap = std::map<midi::channel_t, SynthName>;
 
 using EventType = Ms::EventType;
 using CntrType = Ms::CntrType;
-using Events = std::multimap<tick_t, Event>;
-
-struct Chunk {
-    tick_t beginTick = 0;
-    tick_t endTick = 0;
-    Events events;
-};
-using Chunks = std::map<tick_t /*begin*/, Chunk>;
+using Events = std::map<tick_t, std::vector<Event> >;
 
 struct Program {
     channel_t channel = 0;
     program_t program = 0;
     bank_t bank = 0;
+
+    bool operator==(const Program& other) const
+    {
+        return channel == other.channel
+               && program == other.program
+               && bank == other.bank;
+    }
 };
 using Programs = std::vector<midi::Program>;
 
-struct Track {
-    track_t num = 0;
-    std::vector<channel_t> channels;
-};
-
-struct MidiData {
+struct MidiMapping {
     int division = 480;
-    TempoMap tempoMap;
-    SynthMap synthMap;
-    std::vector<Event> initEvents;  //! NOTE Set channels programs and others
-    std::vector<Track> tracks;
-    Chunks chunks;
+    TempoMap tempo;
+    SynthName synthName;
+    Programs programms;
 
-    bool isValid() const { return !tracks.empty(); }
-
-    std::set<channel_t> channels() const
+    bool isValid() const
     {
-        std::set<channel_t> cs;
-        for (const Event& e : initEvents) {
-            cs.insert(e.channel());
-        }
-        return cs;
+        return !synthName.empty() && !programms.empty() && !tempo.empty();
     }
 
-    std::vector<Event> initEventsForChannels(const std::set<channel_t>& chs) const
+    bool operator==(const MidiMapping& other) const
     {
-        std::vector<Event> evts;
-        for (const Event& e : initEvents) {
-            if (chs.find(e.channel()) != chs.end()) {
-                evts.push_back(e);
-            }
-        }
-        return evts;
-    }
-
-    std::string dump(bool withEvents = false)
-    {
-        std::stringstream ss;
-        ss << "division: " << division << "\n";
-        ss << "tempo changes: " << tempoMap.size() << "\n";
-        for (const auto& it : tempoMap) {
-            ss << "  tick: " << it.first << ", tempo: " << it.second << "\n";
-        }
-        ss << "\n";
-        ss << "tracks count: " << tracks.size() << "\n";
-        ss << "channels count: " << channels().size() << "\n";
-
-        if (withEvents) {
-            //! TODO
-        }
-
-        ss.flush();
-        return ss.str();
+        return division == other.division
+               && tempo == other.tempo
+               && synthName == other.synthName
+               && programms == other.programms;
     }
 };
 
 struct MidiStream {
-    MidiData initData;
-
-    bool isStreamingAllowed = false;
     tick_t lastTick = 0;
-    async::Channel<Chunk> stream;
-    async::Channel<tick_t> request;
 
-    bool isValid() const { return initData.isValid(); }
+    ValCh<std::vector<Event> > controlEventsStream;
+    async::Channel<Events, tick_t /*endTick*/> mainStream;
+    async::Channel<Events, tick_t /*endTick*/> backgroundStream;
+    async::Channel<tick_t /*from*/, tick_t /*from*/> eventsRequest;
+
+    bool operator==(const MidiStream& other) const
+    {
+        return lastTick == other.lastTick
+               && controlEventsStream.val == other.controlEventsStream.val;
+    }
+};
+
+struct MidiData {
+    MidiMapping mapping;
+    MidiStream stream;
+
+    bool isValid() const
+    {
+        return mapping.isValid() && stream.lastTick > 0;
+    }
+
+    bool operator==(const MidiData& other) const
+    {
+        return mapping == other.mapping
+               && stream == other.stream;
+    }
 };
 
 using MidiDeviceID = std::string;
 struct MidiDevice {
     MidiDeviceID id;
     std::string name;
+
+    bool operator==(const MidiDevice& other) const
+    {
+        return id == other.id;
+    }
 };
-}
+
+using MidiDeviceList = std::vector<MidiDevice>;
 }
 
 #endif // MU_MIDI_MIDITYPES_H

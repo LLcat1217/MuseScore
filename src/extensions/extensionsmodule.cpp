@@ -1,27 +1,30 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "extensionsmodule.h"
 
 #include <QQmlEngine>
 
 #include "internal/extensionsconfiguration.h"
-#include "internal/extensionscontroller.h"
+#include "internal/extensionsservice.h"
 #include "internal/extensionunpacker.h"
 #include "view/extensionlistmodel.h"
 
@@ -31,7 +34,7 @@
 using namespace mu::extensions;
 
 static ExtensionsConfiguration* m_extensionsConfiguration = new ExtensionsConfiguration();
-static ExtensionsController* m_extensionsController = new ExtensionsController();
+static ExtensionsService* m_extensionsService = new ExtensionsService();
 
 static void extensions_init_qrc()
 {
@@ -45,9 +48,9 @@ std::string ExtensionsModule::moduleName() const
 
 void ExtensionsModule::registerExports()
 {
-    framework::ioc()->registerExport<IExtensionsConfiguration>(moduleName(), m_extensionsConfiguration);
-    framework::ioc()->registerExport<IExtensionsController>(moduleName(), m_extensionsController);
-    framework::ioc()->registerExport<IExtensionUnpacker>(moduleName(), new ExtensionUnpacker());
+    modularity::ioc()->registerExport<IExtensionsConfiguration>(moduleName(), m_extensionsConfiguration);
+    modularity::ioc()->registerExport<IExtensionsService>(moduleName(), m_extensionsService);
+    modularity::ioc()->registerExport<IExtensionUnpacker>(moduleName(), new ExtensionUnpacker());
 }
 
 void ExtensionsModule::registerResources()
@@ -60,7 +63,7 @@ void ExtensionsModule::registerUiTypes()
     qmlRegisterType<ExtensionListModel>("MuseScore.Extensions", 1, 0, "ExtensionListModel");
     qmlRegisterUncreatableType<ExtensionStatus>("MuseScore.Extensions", 1, 0, "ExtensionStatus", "Cannot create an ExtensionStatus");
 
-    framework::ioc()->resolve<framework::IUiEngine>(moduleName())->addSourceImportPath(extensions_QML_IMPORT);
+    modularity::ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(extensions_QML_IMPORT);
 }
 
 void ExtensionsModule::onInit(const framework::IApplication::RunMode& runMode)
@@ -69,6 +72,10 @@ void ExtensionsModule::onInit(const framework::IApplication::RunMode& runMode)
         return;
     }
 
-    m_extensionsController->init();
     m_extensionsConfiguration->init();
+}
+
+void ExtensionsModule::onDelayedInit()
+{
+    m_extensionsService->refreshExtensions();
 }

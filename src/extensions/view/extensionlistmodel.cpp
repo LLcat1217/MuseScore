@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "extensionlistmodel.h"
 
 #include "log.h"
@@ -71,13 +74,13 @@ QHash<int, QByteArray> mu::extensions::ExtensionListModel::roleNames() const
 
 void ExtensionListModel::load()
 {
-    ValCh<ExtensionsHash> extensions = extensionsController()->extensions();
+    ValCh<ExtensionsHash> extensions = extensionsService()->extensions();
 
     beginResetModel();
     m_list = extensions.val.values();
     endResetModel();
 
-    RetCh<Extension> extensionChanged = extensionsController()->extensionChanged();
+    RetCh<Extension> extensionChanged = extensionsService()->extensionChanged();
     extensionChanged.ch.onReceive(this, [this](const Extension& newExtension) {
         for (int i = 0; i < m_list.count(); i++) {
             if (m_list[i].code == newExtension.code) {
@@ -98,7 +101,7 @@ void ExtensionListModel::install(QString code)
         return;
     }
 
-    RetCh<ExtensionProgress> installRet = extensionsController()->install(m_list.at(index).code);
+    RetCh<ExtensionProgress> installRet = extensionsService()->install(m_list.at(index).code);
     if (!installRet.ret) {
         LOGE() << installRet.ret.toString();
         return;
@@ -121,7 +124,7 @@ void ExtensionListModel::uninstall(QString code)
         return;
     }
 
-    Ret uninstallRet = extensionsController()->uninstall(m_list.at(index).code);
+    Ret uninstallRet = extensionsService()->uninstall(m_list.at(index).code);
     if (!uninstallRet) {
         LOGE() << uninstallRet.toString();
         return;
@@ -138,7 +141,7 @@ void ExtensionListModel::update(QString code)
         return;
     }
 
-    RetCh<ExtensionProgress> updateRet = extensionsController()->update(m_list.at(index).code);
+    RetCh<ExtensionProgress> updateRet = extensionsService()->update(m_list.at(index).code);
     if (!updateRet.ret) {
         LOGE() << updateRet.ret.toString();
         return;
@@ -173,7 +176,7 @@ QVariantMap ExtensionListModel::extension(QString code)
 
     QVariantMap result;
 
-    QHash<int,QByteArray> names = roleNames();
+    QHash<int, QByteArray> names = roleNames();
     QHashIterator<int, QByteArray> i(names);
     while (i.hasNext()) {
         i.next();

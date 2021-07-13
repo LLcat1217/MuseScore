@@ -1,5 +1,27 @@
-import QtQuick 2.7
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+import QtQuick 2.15
 
+import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 
 Item {
@@ -10,9 +32,16 @@ Item {
     property alias searchEnabled: searchField.visible
     property alias searchText: searchField.searchText
 
-    property bool boldFont: false
+    property alias navigation: navPanel
 
     signal titleClicked(var index)
+
+    NavigationPanel {
+        id: navPanel
+        name: "TitleListView"
+        direction: NavigationPanel.Vertical
+        enabled: root.visible
+    }
 
     StyledTextLabel {
         id: title
@@ -28,6 +57,10 @@ Item {
         anchors.top: title.bottom
         anchors.topMargin: 16
 
+        navigation.name: "Search"
+        navigation.panel: navPanel
+        navigation.row: 1
+
         width: parent.width
     }
 
@@ -39,24 +72,22 @@ Item {
         anchors.bottom: parent.bottom
 
         width: parent.width
-        spacing: 8
+        spacing: 0
 
         boundsBehavior: ListView.StopAtBounds
         clip: true
 
         currentIndex: 0
 
-        delegate: Item {
-            width: ListView.view.width
-            height: 30
+        delegate: ListItemBlank {
+            id: item
 
-            property bool isCurrent: view.currentIndex === model.index
+            isSelected: view.currentIndex === model.index
 
-            Rectangle {
-                anchors.fill: parent
-                color: isCurrent ? ui.theme.accentColor : ui.theme.backgroundPrimaryColor
-                opacity: isCurrent ? 0.3 : 1
-            }
+            navigation.name: modelData
+            navigation.panel: navPanel
+            navigation.row: 2 + model.index
+            onNavigationActived: item.clicked()
 
             StyledTextLabel {
                 id: titleLabel
@@ -66,16 +97,12 @@ Item {
 
                 horizontalAlignment: Text.AlignLeft
                 text: modelData
-                font: root.boldFont ? ui.theme.bodyBoldFont : ui.theme.bodyFont
+                font: ui.theme.bodyBoldFont
             }
 
-            MouseArea {
-                anchors.fill: parent
-
-                onClicked: {
-                    view.currentIndex = model.index
-                    root.titleClicked(model.index)
-                }
+            onClicked: {
+                view.currentIndex = model.index
+                root.titleClicked(model.index)
             }
         }
     }

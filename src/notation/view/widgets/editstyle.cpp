@@ -1,50 +1,71 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "editstyle.h"
 
 #include <QButtonGroup>
 #include <QSignalMapper>
-#include <QScreen>
 
 #include "alignSelect.h"
-#include "offsetSelect.h"
+#include "colorlabel.h"
 #include "fontStyleSelect.h"
-
+#include "framework/global/widgetstatestore.h"
 #include "libmscore/figuredbass.h"
 #include "libmscore/layout.h"
+#include "libmscore/scorefont.h"
 #include "libmscore/sym.h"
-#include "awl/colorlabel.h"
+#include "libmscore/realizedharmony.h"
+#include "log.h"
+#include "offsetSelect.h"
+#include "settings.h"
+#include "translation.h"
 #include "ui/view/iconcodes.h"
 
-#include "framework/global/widgetstatestore.h"
-
-#include "translation.h"
-
 using namespace mu::notation;
-using namespace mu::notation;
+using namespace mu::ui;
 using namespace mu::framework;
 
 static const QChar GO_NEXT_ICON = iconCodeToChar(IconCode::Code::ARROW_RIGHT);
 static const QChar GO_PREV_ICON = iconCodeToChar(IconCode::Code::ARROW_LEFT);
 static const QChar OPEN_FILE_ICON = iconCodeToChar(IconCode::Code::OPEN_FILE);
 static const QChar RESET_ICON = iconCodeToChar(IconCode::Code::REDO);
+
+static const Settings::Key STYLE_MENU_ORDER("notation", "ui/styleMenuOrder");
+
+static const char* lineStyles[] = {
+    QT_TRANSLATE_NOOP("notation", "Continuous"),
+    QT_TRANSLATE_NOOP("notation", "Dashed"),
+    QT_TRANSLATE_NOOP("notation", "Dotted"),
+    QT_TRANSLATE_NOOP("notation", "Dash-dotted"),
+    QT_TRANSLATE_NOOP("notation", "Dash-dot-dotted")
+};
+
+static void fillDirectionComboBox(QComboBox* comboBox)
+{
+    comboBox->clear();
+    comboBox->addItem(Ms::toUserString(Ms::Direction::AUTO), QVariant::fromValue<Ms::Direction>(Ms::Direction::AUTO));
+    comboBox->addItem(Ms::toUserString(Ms::Direction::UP),   QVariant::fromValue<Ms::Direction>(Ms::Direction::UP));
+    comboBox->addItem(Ms::toUserString(Ms::Direction::DOWN), QVariant::fromValue<Ms::Direction>(Ms::Direction::DOWN));
+}
 
 //---------------------------------------------------------
 //   EditStyle
@@ -55,10 +76,15 @@ EditStyle::EditStyle(QWidget* parent)
 {
     setObjectName("EditStyle");
     setupUi(this);
-    setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    setWindowFlag(Qt::WindowContextHelpButtonHint, false);
+    setModal(true);
+
     buttonApplyToAllParts = buttonBox->addButton(tr("Apply to all Parts"), QDialogButtonBox::ApplyRole);
     buttonTogglePagelist->setText(GO_NEXT_ICON);
-    setModal(true);
+
+    // ====================================================
+    // Button Groups
+    // ====================================================
 
     // create button groups for every set of radio button widgets
     // use this group widgets in list styleWidgets
@@ -85,24 +111,9 @@ EditStyle::EditStyle(QWidget* parent)
     fbStyle->addButton(radioFBModern, 0);
     fbStyle->addButton(radioFBHistoric, 1);
 
-    const char* styles[] = {
-        QT_TRANSLATE_NOOP("EditStyleBase", "Continuous"),
-        QT_TRANSLATE_NOOP("EditStyleBase", "Dashed"),
-        QT_TRANSLATE_NOOP("EditStyleBase", "Dotted"),
-        QT_TRANSLATE_NOOP("EditStyleBase", "Dash-dotted"),
-        QT_TRANSLATE_NOOP("EditStyleBase", "Dash-dot-dotted")
-    };
-    int dta = 1;
-    voltaLineStyle->clear();
-    ottavaLineStyle->clear();
-    pedalLineStyle->clear();
-    for (const char* p : styles) {
-        QString trs = mu::qtrc("notation", p);
-        voltaLineStyle->addItem(trs, dta);
-        ottavaLineStyle->addItem(trs, dta);
-        pedalLineStyle->addItem(trs, dta);
-        ++dta;
-    }
+    // ====================================================
+    // Style widgets
+    // ====================================================
 
     styleWidgets = {
         //   idx                --- showPercent      --- widget          --- resetButton
@@ -121,8 +132,18 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::staffLowerBorder,        false, staffLowerBorder,        resetStaffLowerBorder },
         { StyleId::staffDistance,           false, staffDistance,           resetStaffDistance },
         { StyleId::akkoladeDistance,        false, akkoladeDistance,        resetAkkoladeDistance },
+        { StyleId::enableVerticalSpread,    false, enableVerticalSpread,    0 },
         { StyleId::minSystemDistance,       false, minSystemDistance,       resetMinSystemDistance },
         { StyleId::maxSystemDistance,       false, maxSystemDistance,       resetMaxSystemDistance },
+        { StyleId::spreadSystem,            false, spreadSystem,            resetSpreadSystem },
+        { StyleId::spreadSquareBracket,     false, spreadSquareBracket,     resetSpreadSquareBracket },
+        { StyleId::spreadCurlyBracket,      false, spreadCurlyBracket,      resetSpreadCurlyBracket },
+        { StyleId::minSystemSpread,         false, minSystemSpread,         resetMinSystemSpread },
+        { StyleId::maxSystemSpread,         false, maxSystemSpread,         resetMaxSystemSpread },
+        { StyleId::minStaffSpread,          false, minStaffSpread,          resetMinStaffSpread },
+        { StyleId::maxStaffSpread,          false, maxStaffSpread,          resetMaxStaffSpread },
+        { StyleId::maxAkkoladeDistance,     false, maxAkkoladeDistance,     resetMaxAkkoladeDistance },
+        { StyleId::maxPageFillSpread,       false, maxPageFillSpread,       resetMaxPageFillSpread },
 
         { StyleId::lyricsPlacement,         false, lyricsPlacement,         resetLyricsPlacement },
         { StyleId::lyricsPosAbove,          false, lyricsPosAbove,          resetLyricsPosAbove },
@@ -147,6 +168,12 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::frameSystemDistance,     false, frameSystemDistance,     resetFrameSystemDistance },
         { StyleId::minMeasureWidth,         false, minMeasureWidth_2,       resetMinMeasureWidth },
         { StyleId::measureSpacing,          false, measureSpacing,          resetMeasureSpacing },
+        { StyleId::measureRepeatNumberPos,  false, measureRepeatNumberPos,  resetMeasureRepeatNumberPos },
+        { StyleId::mrNumberSeries,          false, mrNumberSeries,          0 },
+        { StyleId::mrNumberEveryXMeasures,  false, mrNumberEveryXMeasures,  resetMRNumberEveryXMeasures },
+        { StyleId::mrNumberSeriesWithParentheses, false, mrNumberSeriesWithParentheses, resetMRNumberSeriesWithParentheses },
+        { StyleId::oneMeasureRepeatShow1,   false, oneMeasureRepeatShow1,   resetOneMeasureRepeatShow1 },
+        { StyleId::fourMeasureRepeatShowExtenders, false, fourMeasureRepeatShowExtenders, resetFourMeasureRepeatShowExtenders },
 
         { StyleId::barWidth,                false, barWidth,                resetBarWidth },
         { StyleId::endBarWidth,             false, endBarWidth,             resetEndBarWidth },
@@ -186,10 +213,14 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::mmRestOldStyleSpacing,   false, mmRestOldStyleSpacing,   resetMMRestOldStyleSpacing },
         { StyleId::hideEmptyStaves,         false, hideEmptyStaves,         0 },
         { StyleId::dontHideStavesInFirstSystem, false, dontHideStavesInFirstSystem, 0 },
+        { StyleId::enableIndentationOnFirstSystem, false, enableIndentationOnFirstSystem, 0 },
+        { StyleId::firstSystemIndentationValue, false, indentationValue, resetFirstSystemIndentation },
         { StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden, false, alwaysShowBrackets, 0 },
         { StyleId::hideInstrumentNameIfOneInstrument, false, hideInstrumentNameIfOneInstrument, 0 },
         { StyleId::accidentalNoteDistance,  false, accidentalNoteDistance,  0 },
         { StyleId::accidentalDistance,      false, accidentalDistance,      0 },
+        { StyleId::bracketedAccidentalPadding, false, accidentalsBracketsBadding, resetAccidentalsBracketPadding },
+        { StyleId::alignAccidentalsLeft,    false, accidentalsOctaveColumnsAlignLeft, resetAccidentalsOctaveColumnsAlignLeft },
 
         { StyleId::minNoteDistance,         false, minNoteDistance,         resetMinNoteDistance },
         { StyleId::barNoteDistance,         false, barNoteDistance,         resetBarNoteDistance },
@@ -204,8 +235,7 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::keyTimesigDistance,      false, keyTimesigDistance,      resetKeyTimesigDistance },
         { StyleId::keyBarlineDistance,      false, keyBarlineDistance,      resetKeyBarlineDistance },
         { StyleId::systemHeaderDistance,    false, systemHeaderDistance,    resetSystemHeaderDistance },
-        { StyleId::systemHeaderTimeSigDistance,    false, systemHeaderTimeSigDistance,
-          resetSystemHeaderTimeSigDistance },
+        { StyleId::systemHeaderTimeSigDistance, false, systemHeaderTimeSigDistance, resetSystemHeaderTimeSigDistance },
 
         { StyleId::clefBarlineDistance,     false, clefBarlineDistance,     resetClefBarlineDistance },
         { StyleId::timesigBarlineDistance,  false, timesigBarlineDistance,  resetTimesigBarlineDistance },
@@ -230,7 +260,7 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::ArpeggioNoteDistance,    false, arpeggioNoteDistance,    0 },
         { StyleId::ArpeggioLineWidth,       false, arpeggioLineWidth,       0 },
         { StyleId::ArpeggioHookLen,         false, arpeggioHookLen,         0 },
-        { StyleId::ArpeggioHiddenInStdIfTab,false, arpeggioHiddenInStdIfTab,0 },
+        { StyleId::ArpeggioHiddenInStdIfTab, false, arpeggioHiddenInStdIfTab, 0 },
         { StyleId::SlurEndWidth,            false, slurEndLineWidth,        resetSlurEndLineWidth },
         { StyleId::SlurMidWidth,            false, slurMidLineWidth,        resetSlurMidLineWidth },
         { StyleId::SlurDottedWidth,         false, slurDottedLineWidth,     resetSlurDottedLineWidth },
@@ -268,13 +298,19 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::trillPosAbove,           false, trillLinePosAbove,       resetTrillLinePosAbove },
         { StyleId::trillPosBelow,           false, trillLinePosBelow,       resetTrillLinePosBelow },
 
-        { StyleId::vibratoPlacement,        false, vibratoLinePlacement,      resetVibratoLinePlacement },
-        { StyleId::vibratoPosAbove,         false, vibratoLinePosAbove,       resetVibratoLinePosAbove },
-        { StyleId::vibratoPosBelow,         false, vibratoLinePosBelow,       resetVibratoLinePosBelow },
+        { StyleId::vibratoPlacement,        false, vibratoLinePlacement,    resetVibratoLinePlacement },
+        { StyleId::vibratoPosAbove,         false, vibratoLinePosAbove,     resetVibratoLinePosAbove },
+        { StyleId::vibratoPosBelow,         false, vibratoLinePosBelow,     resetVibratoLinePosBelow },
 
         { StyleId::harmonyFretDist,         false, harmonyFretDist,         0 },
         { StyleId::minHarmonyDistance,      false, minHarmonyDistance,      0 },
         { StyleId::maxHarmonyBarDistance,   false, maxHarmonyBarDistance,   0 },
+        { StyleId::maxChordShiftAbove,      false, maxChordShiftAbove,      resetMaxChordShiftAbove },
+        { StyleId::maxChordShiftBelow,      false, maxChordShiftBelow,      resetMaxChordShiftBelow },
+        { StyleId::harmonyPlay,             false, harmonyPlay,             0 },
+        { StyleId::harmonyVoiceLiteral,     false, voicingSelectWidget->interpretBox, 0 },
+        { StyleId::harmonyVoicing,          false, voicingSelectWidget->voicingBox, 0 },
+        { StyleId::harmonyDuration,         false, voicingSelectWidget->durationBox, 0 },
 
         { StyleId::tupletVHeadDistance,     false, tupletVHeadDistance,     resetTupletVHeadDistance },
         { StyleId::tupletVStemDistance,     false, tupletVStemDistance,     resetTupletVStemDistance },
@@ -303,6 +339,15 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::measureNumberAllStaves,   false, showAllStavesMeasureNumber,   0 },
         { StyleId::measureNumberVPlacement,  false, measureNumberVPlacement,      resetMeasureNumberVPlacement },
         { StyleId::measureNumberHPlacement,  false, measureNumberHPlacement,      resetMeasureNumberHPlacement },
+        { StyleId::measureNumberPosAbove,    false, measureNumberPosAbove,        resetMeasureNumberPosAbove },
+        { StyleId::measureNumberPosBelow,    false, measureNumberPosBelow,        resetMeasureNumberPosBelow },
+
+        { StyleId::mmRestShowMeasureNumberRange, false, mmRestShowMeasureNumberRange, 0 },
+        { StyleId::mmRestRangeBracketType,   false, mmRestRangeBracketType,       resetMmRestRangeBracketType },
+        { StyleId::mmRestRangeVPlacement,    false, mmRestRangeVPlacement,        resetMmRestRangeVPlacement },
+        { StyleId::mmRestRangeHPlacement,    false, mmRestRangeHPlacement,        resetMmRestRangeHPlacement },
+        { StyleId::mmRestRangePosAbove,      false, mmRestRangePosAbove,          resetMMRestRangePosAbove },
+        { StyleId::mmRestRangePosBelow,      false, mmRestRangePosBelow,          resetMMRestRangePosBelow },
 
         { StyleId::beamDistance,             true,  beamDistance,                 0 },
         { StyleId::beamNoSlope,              false, beamNoSlope,                  0 },
@@ -350,6 +395,8 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::fretDotSize,              false, fretDotSize,                  0 },
         { StyleId::fretStringSpacing,        false, fretStringSpacing,            0 },
         { StyleId::fretFretSpacing,          false, fretFretSpacing,              0 },
+        { StyleId::maxFretShiftAbove,        false, maxFretShiftAbove,            resetMaxFretShiftAbove },
+        { StyleId::maxFretShiftBelow,        false, maxFretShiftBelow,            resetMaxFretShiftBelow },
         { StyleId::scaleBarlines,            false, scaleBarlines,                resetScaleBarlines },
         { StyleId::crossMeasureValues,       false, crossMeasureValues,           0 },
 
@@ -379,6 +426,10 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::textLinePosAbove,            false, textLinePosAbove,            resetTextLinePosAbove },
         { StyleId::textLinePosBelow,            false, textLinePosBelow,            resetTextLinePosBelow },
 
+        { StyleId::systemTextLinePlacement,     false, systemTextLinePlacement,     resetSystemTextLinePlacement },
+        { StyleId::systemTextLinePosAbove,      false, systemTextLinePosAbove,      resetSystemTextLinePosAbove },
+        { StyleId::systemTextLinePosBelow,      false, systemTextLinePosBelow,      resetSystemTextLinePosBelow },
+
         { StyleId::fermataPosAbove,         false, fermataPosAbove,       resetFermataPosAbove },
         { StyleId::fermataPosBelow,         false, fermataPosBelow,       resetFermataPosBelow },
         { StyleId::fermataMinDistance,      false, fermataMinDistance,    resetFermataMinDistance },
@@ -392,21 +443,61 @@ EditStyle::EditStyle(QWidget* parent)
         { StyleId::bendArrowWidth,    false, bendArrowWidth,    resetBendArrowWidth },
     };
 
-    for (QComboBox* cb : std::vector<QComboBox*> {
-        lyricsPlacement, textLinePlacement, hairpinPlacement, pedalLinePlacement,
-        trillLinePlacement, vibratoLinePlacement, dynamicsPlacement,
-        tempoTextPlacement, staffTextPlacement, rehearsalMarkPlacement,
+    // ====================================================
+    // Combo Boxes
+    // ====================================================
+
+    lineStyleComboBoxes = {
+        voltaLineStyle,
+        ottavaLineStyle,
+        pedalLineStyle
+    };
+
+    for (QComboBox* cb : lineStyleComboBoxes) {
+        cb->clear();
+        int idx = 0;
+        for (const char* p : lineStyles) {
+            cb->addItem(qtrc("notation", p), idx);
+            ++idx;
+        }
+    }
+
+    verticalPlacementComboBoxes = {
+        lyricsPlacement,
+        textLinePlacement,
+        hairpinPlacement,
+        pedalLinePlacement,
+        trillLinePlacement,
+        vibratoLinePlacement,
+        dynamicsPlacement,
+        tempoTextPlacement,
+        staffTextPlacement,
+        rehearsalMarkPlacement,
         measureNumberVPlacement
-    }) {
+    };
+
+    for (QComboBox* cb : verticalPlacementComboBoxes) {
         cb->clear();
         cb->addItem(tr("Above"), int(Ms::Placement::ABOVE));
         cb->addItem(tr("Below"), int(Ms::Placement::BELOW));
     }
 
-    measureNumberHPlacement->clear();
-    measureNumberHPlacement->addItem(tr("Left"),   int(Ms::HPlacement::LEFT));
-    measureNumberHPlacement->addItem(tr("Center"), int(Ms::HPlacement::CENTER));
-    measureNumberHPlacement->addItem(tr("Right"),  int(Ms::HPlacement::RIGHT));
+    horizontalPlacementComboBoxes = {
+        measureNumberHPlacement,
+        mmRestRangeHPlacement
+    };
+
+    for (QComboBox* cb : horizontalPlacementComboBoxes) {
+        cb->clear();
+        cb->addItem(tr("Left"),   int(Ms::HPlacement::LEFT));
+        cb->addItem(tr("Center"), int(Ms::HPlacement::CENTER));
+        cb->addItem(tr("Right"),  int(Ms::HPlacement::RIGHT));
+    }
+
+    mmRestRangeBracketType->clear();
+    mmRestRangeBracketType->addItem(tr("None"),        int(Ms::MMRestRangeBracketType::NONE));
+    mmRestRangeBracketType->addItem(tr("Brackets"),    int(Ms::MMRestRangeBracketType::BRACKETS));
+    mmRestRangeBracketType->addItem(tr("Parentheses"), int(Ms::MMRestRangeBracketType::PARENTHESES));
 
     autoplaceVerticalAlignRange->clear();
     autoplaceVerticalAlignRange->addItem(tr("Segment"), int(Ms::VerticalAlignRange::SEGMENT));
@@ -422,9 +513,6 @@ EditStyle::EditStyle(QWidget* parent)
     tupletBracketType->addItem(tr("Automatic"), int(TupletBracketType::AUTO_BRACKET));
     tupletBracketType->addItem(tr("Bracket"), int(TupletBracketType::SHOW_BRACKET));
     tupletBracketType->addItem(tr("None", "no tuplet bracket type"), int(TupletBracketType::SHOW_NO_BRACKET));
-
-    pageList->setCurrentRow(0);
-    accidentalsGroup->setVisible(false);   // disable, not yet implemented
 
     musicalSymbolFont->clear();
     int idx = 0;
@@ -443,14 +531,405 @@ EditStyle::EditStyle(QWidget* parent)
         dividerRightSym->addItem(un, QVariant(QString(n)));
     }
 
-    // figured bass init
+    // ====================================================
+    // Figured Bass
+    // ====================================================
+
     QList<QString> fbFontNames = Ms::FiguredBass::fontNames();
     for (const QString& family: fbFontNames) {
         comboFBFont->addItem(family);
     }
     comboFBFont->setCurrentIndex(0);
-    connect(comboFBFont, SIGNAL(currentIndexChanged(int)), SLOT(on_comboFBFont_currentIndexChanged(int)));
+    connect(comboFBFont, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &EditStyle::on_comboFBFont_currentIndexChanged);
 
+    // ====================================================
+    // Chord Symbols
+    // ====================================================
+
+    harmonyPlay->setChecked(true);
+
+    voicingSelectWidget->interpretBox->clear();
+    voicingSelectWidget->interpretBox->addItem(tr("Jazz"), int(0));   // two-item combobox for boolean style variant
+    voicingSelectWidget->interpretBox->addItem(tr("Literal"), int(1));   // true = literal
+
+    voicingSelectWidget->voicingBox->clear();
+    voicingSelectWidget->voicingBox->addItem(tr("Automatic"), int(Ms::Voicing::AUTO));
+    voicingSelectWidget->voicingBox->addItem(tr("Root Only"), int(Ms::Voicing::ROOT_ONLY));
+    voicingSelectWidget->voicingBox->addItem(tr("Close"), int(Ms::Voicing::CLOSE));
+    voicingSelectWidget->voicingBox->addItem(tr("Drop Two"), int(Ms::Voicing::DROP_2));
+    voicingSelectWidget->voicingBox->addItem(tr("Six Note"), int(Ms::Voicing::SIX_NOTE));
+    voicingSelectWidget->voicingBox->addItem(tr("Four Note"), int(Ms::Voicing::FOUR_NOTE));
+    voicingSelectWidget->voicingBox->addItem(tr("Three Note"), int(Ms::Voicing::THREE_NOTE));
+
+    voicingSelectWidget->durationBox->clear();
+    voicingSelectWidget->durationBox->addItem(tr("Until Next Chord Symbol"), int(Ms::HDuration::UNTIL_NEXT_CHORD_SYMBOL));
+    voicingSelectWidget->durationBox->addItem(tr("Until End of Measure"), int(Ms::HDuration::STOP_AT_MEASURE_END));
+    voicingSelectWidget->durationBox->addItem(tr("Chord/Rest Duration"), int(Ms::HDuration::SEGMENT_DURATION));
+
+    // ====================================================
+    // Miscellaneous
+    // ====================================================
+
+    setHeaderFooterToolTip();
+
+    connect(buttonBox,             &QDialogButtonBox::clicked,  this, &EditStyle::buttonClicked);
+    connect(enableVerticalSpread,  &QGroupBox::toggled,         this, &EditStyle::enableVerticalSpreadClicked);
+    connect(disableVerticalSpread, &QGroupBox::toggled,         this, &EditStyle::disableVerticalSpreadClicked);
+    connect(headerOddEven,         &QCheckBox::toggled,         this, &EditStyle::toggleHeaderOddEven);
+    connect(footerOddEven,         &QCheckBox::toggled,         this, &EditStyle::toggleFooterOddEven);
+    connect(chordDescriptionFileButton, &QToolButton::clicked,  this, &EditStyle::selectChordDescriptionFile);
+    connect(chordsStandard,        &QRadioButton::toggled,      this, &EditStyle::setChordStyle);
+    connect(chordsJazz,            &QRadioButton::toggled,      this, &EditStyle::setChordStyle);
+    connect(chordsCustom,          &QRadioButton::toggled,      this, &EditStyle::setChordStyle);
+    connect(chordsXmlFile,         &QCheckBox::toggled,         this, &EditStyle::setChordStyle);
+    connect(chordDescriptionFile,  &QLineEdit::editingFinished, [=]() { setChordStyle(true); });
+
+    chordDescriptionFileButton->setText(OPEN_FILE_ICON);
+
+    connect(swingOff,       &QRadioButton::toggled, this, &EditStyle::setSwingParams);
+    connect(swingEighth,    &QRadioButton::toggled, this, &EditStyle::setSwingParams);
+    connect(swingSixteenth, &QRadioButton::toggled, this, &EditStyle::setSwingParams);
+
+    connect(concertPitch,        &QCheckBox::toggled, this, &EditStyle::concertPitchToggled);
+    connect(lyricsDashMinLength, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EditStyle::lyricsDashMinLengthValueChanged);
+    connect(lyricsDashMaxLength, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EditStyle::lyricsDashMaxLengthValueChanged);
+    connect(minSystemDistance,   QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EditStyle::systemMinDistanceValueChanged);
+    connect(maxSystemDistance,   QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EditStyle::systemMaxDistanceValueChanged);
+
+    accidentalsGroup->setVisible(false);   // disable, not yet implemented
+
+    // ====================================================
+    // Signal Mappers
+    // ====================================================
+
+    QSignalMapper* setSignalMapper = new QSignalMapper(this); // value change signals
+    QSignalMapper* resetSignalMapper = new QSignalMapper(this); // reset style signals
+
+    const auto mapFunction = QOverload<>::of(&QSignalMapper::map);
+
+    for (const StyleWidget& sw : styleWidgets) {
+        const char* type = styleValue(sw.idx).typeName();
+
+        if (!strcmp("Direction", type)) {
+            QComboBox* cb = qobject_cast<QComboBox*>(sw.widget);
+            fillDirectionComboBox(cb);
+        }
+
+        if (sw.reset) {
+            sw.reset->setText(RESET_ICON);
+            connect(sw.reset, &QToolButton::clicked, resetSignalMapper, mapFunction);
+            resetSignalMapper->setMapping(sw.reset, static_cast<int>(sw.idx));
+        }
+
+        if (auto spinBox = qobject_cast<QSpinBox*>(sw.widget)) {
+            connect(spinBox, QOverload<int>::of(&QSpinBox::valueChanged), setSignalMapper, mapFunction);
+        } else if (auto doubleSpinBox = qobject_cast<QDoubleSpinBox*>(sw.widget)) {
+            connect(doubleSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), setSignalMapper, mapFunction);
+        } else if (auto fontComboBox = qobject_cast<QFontComboBox*>(sw.widget)) {
+            connect(fontComboBox, &QFontComboBox::currentFontChanged, setSignalMapper, mapFunction);
+        } else if (auto comboBox = qobject_cast<QComboBox*>(sw.widget)) {
+            connect(comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), setSignalMapper, mapFunction);
+        } else if (auto radioButton = qobject_cast<QRadioButton*>(sw.widget)) {
+            connect(radioButton, &QRadioButton::toggled, setSignalMapper, mapFunction);
+        } else if (auto checkBox = qobject_cast<QCheckBox*>(sw.widget)) {
+            connect(checkBox, &QCheckBox::stateChanged, setSignalMapper, mapFunction);
+        } else if (auto button = qobject_cast<QAbstractButton*>(sw.widget)) {
+            connect(button, &QAbstractButton::toggled, setSignalMapper, mapFunction);
+        } else if (auto groupBox = qobject_cast<QGroupBox*>(sw.widget)) {
+            connect(groupBox, &QGroupBox::toggled, setSignalMapper, mapFunction);
+        } else if (auto textEdit = qobject_cast<QTextEdit*>(sw.widget)) {
+            connect(textEdit, &QTextEdit::textChanged, setSignalMapper, mapFunction);
+        } else if (auto buttonGroup = qobject_cast<QButtonGroup*>(sw.widget)) {
+            connect(buttonGroup, QOverload<QAbstractButton*>::of(&QButtonGroup::buttonClicked), setSignalMapper, mapFunction);
+        } else if (auto alignSelect = qobject_cast<AlignSelect*>(sw.widget)) {
+            connect(alignSelect, &AlignSelect::alignChanged, setSignalMapper, mapFunction);
+        } else if (auto offsetSelect = qobject_cast<OffsetSelect*>(sw.widget)) {
+            connect(offsetSelect, &OffsetSelect::offsetChanged, setSignalMapper, mapFunction);
+        } else if (auto fontStyle = qobject_cast<FontStyleSelect*>(sw.widget)) {
+            connect(fontStyle, &FontStyleSelect::fontStyleChanged, setSignalMapper, mapFunction);
+        }
+
+        setSignalMapper->setMapping(sw.widget, static_cast<int>(sw.idx));
+    }
+
+    connect(setSignalMapper, &QSignalMapper::mappedInt, this, &EditStyle::valueChanged);
+    connect(resetSignalMapper, &QSignalMapper::mappedInt, this, &EditStyle::resetStyleValue);
+
+    textStyles->clear();
+    for (auto ss : Ms::allTextStyles()) {
+        QListWidgetItem* item = new QListWidgetItem(Ms::textStyleUserName(ss));
+        item->setData(Qt::UserRole, int(ss));
+        textStyles->addItem(item);
+    }
+
+    textStyleFrameType->clear();
+    textStyleFrameType->addItem(tr("None", "no frame for text"), int(Ms::FrameType::NO_FRAME));
+    textStyleFrameType->addItem(tr("Rectangle"), int(Ms::FrameType::SQUARE));
+    textStyleFrameType->addItem(tr("Circle"), int(Ms::FrameType::CIRCLE));
+
+    resetTextStyleName->setText(RESET_ICON);
+    connect(resetTextStyleName, &QToolButton::clicked, this, &EditStyle::resetUserStyleName);
+    connect(styleName, &QLineEdit::textEdited, this, &EditStyle::editUserStyleName);
+    connect(styleName, &QLineEdit::editingFinished, this, &EditStyle::endEditUserStyleName);
+
+    // font face
+    resetTextStyleFontFace->setText(RESET_ICON);
+    connect(resetTextStyleFontFace, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FONT_FACE);
+    });
+    connect(textStyleFontFace, &QFontComboBox::currentFontChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::FONT_FACE, QVariant(textStyleFontFace->currentFont().family()));
+    });
+
+    // font size
+    resetTextStyleFontSize->setText(RESET_ICON);
+    connect(resetTextStyleFontSize, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FONT_SIZE);
+    });
+    connect(textStyleFontSize, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [=]() {
+        textStyleValueChanged(Ms::Pid::FONT_SIZE, QVariant(textStyleFontSize->value()));
+    });
+
+    // line spacing
+    resetTextStyleLineSpacing->setText(RESET_ICON);
+    connect(resetTextStyleLineSpacing, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::TEXT_LINE_SPACING);
+    });
+    connect(textStyleLineSpacing, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [=]() {
+        textStyleValueChanged(Ms::Pid::TEXT_LINE_SPACING, QVariant(textStyleLineSpacing->value()));
+    });
+
+    // font style
+    resetTextStyleFontStyle->setText(RESET_ICON);
+    connect(resetTextStyleFontStyle, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FONT_STYLE);
+    });
+    connect(textStyleFontStyle, &FontStyleSelect::fontStyleChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::FONT_STYLE, QVariant(int(textStyleFontStyle->fontStyle())));
+    });
+
+    // align
+    resetTextStyleAlign->setText(RESET_ICON);
+    connect(resetTextStyleAlign, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::ALIGN);
+    });
+    connect(textStyleAlign, &AlignSelect::alignChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::ALIGN, QVariant::fromValue(textStyleAlign->align()));
+    });
+
+    // offset
+    resetTextStyleOffset->setText(RESET_ICON);
+    connect(resetTextStyleOffset, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::OFFSET);
+    });
+    connect(textStyleOffset, &OffsetSelect::offsetChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::OFFSET, QVariant(textStyleOffset->offset()));
+    });
+
+    // spatium dependent
+    resetTextStyleSpatiumDependent->setText(RESET_ICON);
+    connect(resetTextStyleSpatiumDependent, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::SIZE_SPATIUM_DEPENDENT);
+    });
+    connect(textStyleSpatiumDependent, &QCheckBox::toggled, [=]() {
+        textStyleValueChanged(Ms::Pid::SIZE_SPATIUM_DEPENDENT, textStyleSpatiumDependent->isChecked());
+    });
+
+    resetTextStyleFrameType->setText(RESET_ICON);
+    connect(resetTextStyleFrameType, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FRAME_TYPE);
+    });
+    connect(textStyleFrameType, QOverload<int>::of(&QComboBox::currentIndexChanged), [=]() {
+        textStyleValueChanged(Ms::Pid::FRAME_TYPE, textStyleFrameType->currentIndex());
+    });
+
+    resetTextStyleFramePadding->setText(RESET_ICON);
+    connect(resetTextStyleFramePadding, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FRAME_PADDING);
+    });
+    connect(textStyleFramePadding, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [=]() {
+        textStyleValueChanged(Ms::Pid::FRAME_PADDING, textStyleFramePadding->value());
+    });
+
+    resetTextStyleFrameBorder->setText(RESET_ICON);
+    connect(resetTextStyleFrameBorder, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FRAME_WIDTH);
+    });
+    connect(textStyleFrameBorder, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [=]() {
+        textStyleValueChanged(Ms::Pid::FRAME_WIDTH, textStyleFrameBorder->value());
+    });
+
+    resetTextStyleFrameBorderRadius->setText(RESET_ICON);
+    connect(resetTextStyleFrameBorderRadius, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FRAME_ROUND);
+    });
+    connect(textStyleFrameBorderRadius, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [=]() {
+        textStyleValueChanged(Ms::Pid::FRAME_ROUND, textStyleFrameBorderRadius->value());
+    });
+
+    resetTextStyleFrameForeground->setText(RESET_ICON);
+    connect(resetTextStyleFrameForeground, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FRAME_FG_COLOR);
+    });
+    connect(textStyleFrameForeground, &Awl::ColorLabel::colorChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::FRAME_FG_COLOR, textStyleFrameForeground->color());
+    });
+
+    resetTextStyleFrameBackground->setText(RESET_ICON);
+    connect(resetTextStyleFrameBackground, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::FRAME_BG_COLOR);
+    });
+    connect(textStyleFrameBackground, &Awl::ColorLabel::colorChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::FRAME_BG_COLOR, textStyleFrameBackground->color());
+    });
+
+    resetTextStyleColor->setText(RESET_ICON);
+    connect(resetTextStyleColor, &QToolButton::clicked, [=]() {
+        resetTextStyle(Ms::Pid::COLOR);
+    });
+    connect(textStyleColor, &Awl::ColorLabel::colorChanged, [=]() {
+        textStyleValueChanged(Ms::Pid::COLOR, textStyleColor->color());
+    });
+
+    connect(textStyles, &QListWidget::currentRowChanged, this, &EditStyle::textStyleChanged);
+    textStyles->setCurrentRow(0);
+
+    connect(pageList, &QListWidget::currentRowChanged, this, &EditStyle::pageListRowChanged);
+    connect(pageList->model(), &QAbstractItemModel::rowsMoved, this, &EditStyle::pageListMoved);
+    pageList->setCurrentRow(0);
+
+    numberOfPage = pageList->count();
+    settings()->setDefaultValue(STYLE_MENU_ORDER, Val(ConsecutiveStr(numberOfPage)));
+    stringToArray(settings()->value(STYLE_MENU_ORDER).toString(), pageListMap);
+    pageListResetOrder();
+    pageStack->setCurrentIndex(pageListMap[0]);
+
+    adjustPagesStackSize(0);
+
+    WidgetStateStore::restoreGeometry(this);
+}
+
+EditStyle::EditStyle(const EditStyle& other)
+    : QDialog(other.parentWidget())
+{
+}
+
+//---------------------------------------------------------
+//   showEvent
+//---------------------------------------------------------
+
+void EditStyle::showEvent(QShowEvent* ev)
+{
+    setValues();
+    pageList->setFocus();
+    globalContext()->currentNotation()->undoStack()->prepareChanges();
+    buttonApplyToAllParts->setEnabled(globalContext()->currentNotation()->style()->canApplyToAllParts());
+    QWidget::showEvent(ev);
+}
+
+//---------------------------------------------------------
+//   hideEvent
+//---------------------------------------------------------
+
+void EditStyle::hideEvent(QHideEvent* ev)
+{
+    WidgetStateStore::saveGeometry(this);
+    QWidget::hideEvent(ev);
+}
+
+//---------------------------------------------------------
+//   changeEvent
+//---------------------------------------------------------
+
+void EditStyle::changeEvent(QEvent* event)
+{
+    QDialog::changeEvent(event);
+    if (event->type() == QEvent::LanguageChange) {
+        retranslate();
+    }
+}
+
+//---------------------------------------------------------
+//   retranslate
+///   NOTE: keep in sync with constructor.
+//---------------------------------------------------------
+
+void EditStyle::retranslate()
+{
+    retranslateUi(this);
+
+    buttonApplyToAllParts->setText(tr("Apply to all Parts"));
+
+    for (QComboBox* cb : lineStyleComboBoxes) {
+        int idx = 0;
+        for (const char* p : lineStyles) {
+            cb->setItemText(idx, qtrc("notation", p));
+            ++idx;
+        }
+    }
+
+    for (QComboBox* cb : verticalPlacementComboBoxes) {
+        cb->setItemText(0, tr("Above"));
+        cb->setItemText(1, tr("Below"));
+    }
+
+    for (QComboBox* cb : horizontalPlacementComboBoxes) {
+        cb->setItemText(0, tr("Left"));
+        cb->setItemText(1, tr("Center"));
+        cb->setItemText(2, tr("Right"));
+    }
+
+    mmRestRangeBracketType->setItemText(0, tr("None"));
+    mmRestRangeBracketType->setItemText(1, tr("Brackets"));
+    mmRestRangeBracketType->setItemText(2, tr("Parentheses"));
+
+    autoplaceVerticalAlignRange->setItemText(0, tr("Segment"));
+    autoplaceVerticalAlignRange->setItemText(1, tr("Measure"));
+    autoplaceVerticalAlignRange->setItemText(2, tr("System"));
+
+    tupletNumberType->setItemText(0, tr("Number"));
+    tupletNumberType->setItemText(1, tr("Ratio"));
+    tupletNumberType->setItemText(2, tr("None", "no tuplet number type"));
+
+    tupletBracketType->setItemText(0, tr("Automatic"));
+    tupletBracketType->setItemText(1, tr("Bracket"));
+    tupletBracketType->setItemText(2, tr("None", "no tuplet bracket type"));
+
+    voicingSelectWidget->interpretBox->setItemText(0, tr("Jazz"));
+    voicingSelectWidget->interpretBox->setItemText(1, tr("Literal"));
+
+    voicingSelectWidget->voicingBox->setItemText(0, tr("Automatic"));
+    voicingSelectWidget->voicingBox->setItemText(1, tr("Root Only"));
+    voicingSelectWidget->voicingBox->setItemText(2, tr("Close"));
+    voicingSelectWidget->voicingBox->setItemText(3, tr("Drop Two"));
+    voicingSelectWidget->voicingBox->setItemText(4, tr("Six Note"));
+    voicingSelectWidget->voicingBox->setItemText(5, tr("Four Note"));
+    voicingSelectWidget->voicingBox->setItemText(6, tr("Three Note"));
+
+    voicingSelectWidget->durationBox->setItemText(0, tr("Until Next Chord Symbol"));
+    voicingSelectWidget->durationBox->setItemText(1, tr("Until End of Measure"));
+    voicingSelectWidget->durationBox->setItemText(2, tr("Chord/Rest Duration"));
+
+    setHeaderFooterToolTip();
+
+    int idx = 0;
+    for (auto ss : Ms::allTextStyles()) {
+        QString name = Ms::textStyleUserName(ss);
+        textStyles->item(idx)->setText(name);
+        ++idx;
+    }
+
+    textStyleFrameType->setItemText(0, tr("None", "no frame for text"));
+    textStyleFrameType->setItemText(1, tr("Rectangle"));
+    textStyleFrameType->setItemText(2, tr("Circle"));
+}
+
+//---------------------------------------------------------
+//   setHeaderFooterToolTip
+//---------------------------------------------------------
+
+void EditStyle::setHeaderFooterToolTip()
+{
     // keep in sync with implementation in Page::replaceTextMacros (page.cpp)
     // jumping thru hoops here to make the job of translators easier, yet have a nice display
     QString toolTipHeaderFooter
@@ -485,6 +964,10 @@ EditStyle::EditStyle(QWidget* parent)
           + tr("Copyright, on first page only")
           + QString("</i></td></tr><tr><td>$c</td><td>-</td><td><i>")
           + tr("Copyright, on all pages")
+          + QString("</i></td></tr><tr><td>$v</td><td>-</td><td><i>")
+          + tr("MuseScore version this score was last saved with")
+          + QString("</i></td></tr><tr><td>$r</td><td>-</td><td><i>")
+          + tr("MuseScore revision this score was last saved with")
           + QString("</i></td></tr><tr><td>$$</td><td>-</td><td><i>")
           + tr("The $ sign itself")
           + QString("</i></td></tr><tr><td>$:tag:</td><td>-</td><td><i>")
@@ -510,211 +993,11 @@ EditStyle::EditStyle(QWidget* parent)
     showHeader->setToolTipDuration(5000);   // leaving the default value of -1 calculates the duration automatically and it takes too long
     showFooter->setToolTip(toolTipHeaderFooter);
     showFooter->setToolTipDuration(5000);
-
-    connect(buttonBox,           SIGNAL(clicked(QAbstractButton*)), SLOT(buttonClicked(QAbstractButton*)));
-    connect(headerOddEven,       SIGNAL(toggled(bool)),             SLOT(toggleHeaderOddEven(bool)));
-    connect(footerOddEven,       SIGNAL(toggled(bool)),             SLOT(toggleFooterOddEven(bool)));
-    connect(chordDescriptionFileButton, SIGNAL(clicked()),          SLOT(selectChordDescriptionFile()));
-    connect(chordsStandard,      SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
-    connect(chordsJazz,          SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
-    connect(chordsCustom,        SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
-    connect(chordsXmlFile,       SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
-    connect(chordDescriptionFile,&QLineEdit::editingFinished,       [=]() { setChordStyle(true); });
-
-    chordDescriptionFileButton->setText(OPEN_FILE_ICON);
-
-    connect(swingOff,            SIGNAL(toggled(bool)),             SLOT(setSwingParams(bool)));
-    connect(swingEighth,         SIGNAL(toggled(bool)),             SLOT(setSwingParams(bool)));
-    connect(swingSixteenth,      SIGNAL(toggled(bool)),             SLOT(setSwingParams(bool)));
-
-    connect(concertPitch,        SIGNAL(toggled(bool)),             SLOT(concertPitchToggled(bool)));
-    connect(lyricsDashMinLength, SIGNAL(valueChanged(double)),      SLOT(lyricsDashMinLengthValueChanged(double)));
-    connect(lyricsDashMaxLength, SIGNAL(valueChanged(double)),      SLOT(lyricsDashMaxLengthValueChanged(double)));
-    connect(minSystemDistance,   SIGNAL(valueChanged(double)),      SLOT(systemMinDistanceValueChanged(double)));
-    connect(maxSystemDistance,   SIGNAL(valueChanged(double)),      SLOT(systemMaxDistanceValueChanged(double)));
-
-    QSignalMapper* mapper  = new QSignalMapper(this);       // reset style signals
-    QSignalMapper* mapper2 = new QSignalMapper(this);       // value change signals
-
-    for (const StyleWidget& sw : styleWidgets) {
-        const char* type = styleValue(sw.idx).typeName();
-
-        if (!strcmp("Direction", type)) {
-            QComboBox* cb = qobject_cast<QComboBox*>(sw.widget);
-            Ms::fillComboBoxDirection(cb);
-        }
-        if (sw.reset) {
-            sw.reset->setText(RESET_ICON);
-            connect(sw.reset, SIGNAL(clicked()), mapper, SLOT(map()));
-            mapper->setMapping(sw.reset, int(sw.idx));
-        }
-        if (qobject_cast<QSpinBox*>(sw.widget)) {
-            connect(qobject_cast<QSpinBox*>(sw.widget), SIGNAL(valueChanged(int)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QDoubleSpinBox*>(sw.widget)) {
-            connect(qobject_cast<QDoubleSpinBox*>(sw.widget), SIGNAL(valueChanged(double)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QFontComboBox*>(sw.widget)) {
-            connect(qobject_cast<QFontComboBox*>(sw.widget), SIGNAL(currentFontChanged(const QFont&)), mapper2,
-                    SLOT(map()));
-        } else if (qobject_cast<QComboBox*>(sw.widget)) {
-            connect(qobject_cast<QComboBox*>(sw.widget), SIGNAL(currentIndexChanged(int)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QRadioButton*>(sw.widget)) {
-            connect(qobject_cast<QRadioButton*>(sw.widget), SIGNAL(toggled(bool)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QPushButton*>(sw.widget)) {
-            connect(qobject_cast<QPushButton*>(sw.widget), SIGNAL(toggled(bool)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QToolButton*>(sw.widget)) {
-            connect(qobject_cast<QToolButton*>(sw.widget), SIGNAL(toggled(bool)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QGroupBox*>(sw.widget)) {
-            connect(qobject_cast<QGroupBox*>(sw.widget), SIGNAL(toggled(bool)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QCheckBox*>(sw.widget)) {
-            connect(qobject_cast<QCheckBox*>(sw.widget), SIGNAL(stateChanged(int)), mapper2, SLOT(map()));
-        } else if (qobject_cast<QTextEdit*>(sw.widget)) {
-            connect(qobject_cast<QTextEdit*>(sw.widget), SIGNAL(textChanged()), mapper2, SLOT(map()));
-        } else if (qobject_cast<QButtonGroup*>(sw.widget)) {
-            connect(qobject_cast<QButtonGroup*>(sw.widget), SIGNAL(buttonClicked(int)), mapper2, SLOT(map()));
-        } else if (qobject_cast<AlignSelect*>(sw.widget)) {
-            connect(qobject_cast<AlignSelect*>(sw.widget), SIGNAL(alignChanged(Align)), mapper2, SLOT(map()));
-        } else if (qobject_cast<OffsetSelect*>(sw.widget)) {
-            connect(qobject_cast<OffsetSelect*>(sw.widget), SIGNAL(offsetChanged(const QPointF&)), mapper2,
-                    SLOT(map()));
-        } else if (FontStyleSelect* fontStyle = qobject_cast<FontStyleSelect*>(sw.widget)) {
-            connect(fontStyle, &FontStyleSelect::fontStyleChanged, mapper2, QOverload<>::of(&QSignalMapper::map));
-        }
-
-        mapper2->setMapping(sw.widget, int(sw.idx));
-    }
-
-    int topBottomMargin = automaticCapitalization->rect().height() - configuration()->fontSize();
-    topBottomMargin /= 2;
-    topBottomMargin = topBottomMargin > 4 ? topBottomMargin - 4 : 0;
-    automaticCapitalization->layout()->setContentsMargins(9, topBottomMargin, 9, topBottomMargin);
-
-    connect(mapper,  SIGNAL(mapped(int)), SLOT(resetStyleValue(int)));
-    connect(mapper2, SIGNAL(mapped(int)), SLOT(valueChanged(int)));
-    textStyles->clear();
-    for (auto ss : Ms::allTextStyles()) {
-        QListWidgetItem* item = new QListWidgetItem(Ms::textStyleUserName(ss));
-        item->setData(Qt::UserRole, int(ss));
-        textStyles->addItem(item);
-    }
-
-    textStyleFrameType->clear();
-    textStyleFrameType->addItem(tr("None", "no frame for text"), int(Ms::FrameType::NO_FRAME));
-    textStyleFrameType->addItem(tr("Rectangle"), int(Ms::FrameType::SQUARE));
-    textStyleFrameType->addItem(tr("Circle"), int(Ms::FrameType::CIRCLE));
-
-    resetTextStyleName->setText(RESET_ICON);
-    connect(resetTextStyleName, &QToolButton::clicked, [=]() { resetUserStyleName(); });
-    connect(styleName, &QLineEdit::textEdited, [=]() { editUserStyleName(); });
-    connect(styleName, &QLineEdit::editingFinished, [=]() { endEditUserStyleName(); });
-
-    // font face
-    resetTextStyleFontFace->setText(RESET_ICON);
-    connect(resetTextStyleFontFace, &QToolButton::clicked,
-            [=]() { resetTextStyle(Ms::Pid::FONT_FACE); }
-            );
-    connect(textStyleFontFace, &QFontComboBox::currentFontChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::FONT_FACE, QVariant(textStyleFontFace->currentFont().family())); }
-            );
-
-    // font size
-    resetTextStyleFontSize->setText(RESET_ICON);
-    connect(resetTextStyleFontSize, &QToolButton::clicked,
-            [=]() { resetTextStyle(Ms::Pid::FONT_SIZE); }
-            );
-    connect(textStyleFontSize, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            [=]() { textStyleValueChanged(Ms::Pid::FONT_SIZE, QVariant(textStyleFontSize->value())); }
-            );
-
-    // font style
-    resetTextStyleFontStyle->setText(RESET_ICON);
-    connect(resetTextStyleFontStyle, &QToolButton::clicked,
-            [=]() { resetTextStyle(Ms::Pid::FONT_STYLE); }
-            );
-
-    connect(textStyleFontStyle, &notation::FontStyleSelect::fontStyleChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::FONT_STYLE, QVariant(int(textStyleFontStyle->fontStyle()))); }
-            );
-
-    // align
-    resetTextStyleAlign->setText(RESET_ICON);
-    connect(resetTextStyleAlign, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::ALIGN); });
-    connect(textStyleAlign, &AlignSelect::alignChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::ALIGN, QVariant::fromValue(textStyleAlign->align())); }
-            );
-
-    // offset
-    resetTextStyleOffset->setText(RESET_ICON);
-    connect(resetTextStyleOffset, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::OFFSET); });
-    connect(textStyleOffset, &OffsetSelect::offsetChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::OFFSET, QVariant(textStyleOffset->offset())); }
-            );
-
-    // spatium dependent
-    resetTextStyleSpatiumDependent->setText(RESET_ICON);
-    connect(resetTextStyleSpatiumDependent, &QToolButton::clicked, [=]() {
-        resetTextStyle(Ms::Pid::SIZE_SPATIUM_DEPENDENT);
-    });
-    connect(textStyleSpatiumDependent, &QCheckBox::toggled,
-            [=]() { textStyleValueChanged(Ms::Pid::SIZE_SPATIUM_DEPENDENT, textStyleSpatiumDependent->isChecked()); }
-            );
-
-    resetTextStyleFrameType->setText(RESET_ICON);
-    connect(resetTextStyleFrameType, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::FRAME_TYPE); });
-    connect(textStyleFrameType, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            [=]() { textStyleValueChanged(Ms::Pid::FRAME_TYPE, textStyleFrameType->currentIndex()); }
-            );
-
-    resetTextStyleFramePadding->setText(RESET_ICON);
-    connect(resetTextStyleFramePadding, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::FRAME_PADDING); });
-    connect(textStyleFramePadding, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            [=]() { textStyleValueChanged(Ms::Pid::FRAME_PADDING, textStyleFramePadding->value()); }
-            );
-
-    resetTextStyleFrameBorder->setText(RESET_ICON);
-    connect(resetTextStyleFrameBorder, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::FRAME_WIDTH); });
-    connect(textStyleFrameBorder, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            [=]() { textStyleValueChanged(Ms::Pid::FRAME_WIDTH, textStyleFrameBorder->value()); }
-            );
-
-    resetTextStyleFrameBorderRadius->setText(RESET_ICON);
-    connect(resetTextStyleFrameBorderRadius, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::FRAME_ROUND); });
-    connect(textStyleFrameBorderRadius, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            [=]() { textStyleValueChanged(Ms::Pid::FRAME_ROUND, textStyleFrameBorderRadius->value()); }
-            );
-
-    resetTextStyleFrameForeground->setText(RESET_ICON);
-    connect(resetTextStyleFrameForeground, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::FRAME_FG_COLOR); });
-    connect(textStyleFrameForeground, &Awl::ColorLabel::colorChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::FRAME_FG_COLOR, textStyleFrameForeground->color()); }
-            );
-
-    resetTextStyleFrameBackground->setText(RESET_ICON);
-    connect(resetTextStyleFrameBackground, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::FRAME_BG_COLOR); });
-    connect(textStyleFrameBackground, &Awl::ColorLabel::colorChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::FRAME_BG_COLOR, textStyleFrameBackground->color()); }
-            );
-
-    resetTextStyleColor->setText(RESET_ICON);
-    connect(resetTextStyleColor, &QToolButton::clicked, [=]() { resetTextStyle(Ms::Pid::COLOR); });
-    connect(textStyleColor, &Awl::ColorLabel::colorChanged,
-            [=]() { textStyleValueChanged(Ms::Pid::COLOR, textStyleColor->color()); }
-            );
-
-    connect(textStyles, SIGNAL(currentRowChanged(int)), SLOT(textStyleChanged(int)));
-    textStyles->setCurrentRow(0);
-
-    QRect scr = QGuiApplication::primaryScreen()->availableGeometry();
-    QRect dlg = this->frameGeometry();
-    isTooBig  = dlg.width() > scr.width() || dlg.height() > scr.height();
-    if (isTooBig) {
-        this->setMinimumSize(scr.width() / 2, scr.height() / 2);
-    }
-    hasShown = false;
-
-    adjustPagesStackSize(0);
-
-    WidgetStateStore::restoreGeometry(this);
 }
+
+//---------------------------------------------------------
+//   adjustPagesStackSize
+//---------------------------------------------------------
 
 void EditStyle::adjustPagesStackSize(int currentPageIndex)
 {
@@ -726,49 +1009,239 @@ void EditStyle::adjustPagesStackSize(int currentPageIndex)
         if (!currentPage) {
             return;
         }
-
         pageStack->setMinimumSize(currentPage->sizeHint());
-
-        if (scrollArea) {
-            scrollArea->ensureVisible(0, 0);
-        }
     });
 }
 
-EditStyle::EditStyle(const EditStyle& other)
-    : QDialog(other.parentWidget())
-{
-}
-
 //---------------------------------------------------------
-//   showEvent
+//   pageForElement
+///   Returns the page related to the element `e`, to allow the creation of a 'Style...'
+///   menu for every possible element on the score.
 //---------------------------------------------------------
 
-void EditStyle::showEvent(QShowEvent* ev)
+EditStyle::EditStylePage EditStyle::pageForElement(Element* e)
 {
-    if (!hasShown && isTooBig) {
-        // Add scroll bars to pageStack - this cannot be in the constructor
-        // or the Header, Footer text input boxes size themselves too large.
-        scrollArea = new QScrollArea(splitter);
-        scrollArea->setWidget(pageStack);
-        scrollArea->setWidgetResizable(true);
-        hasShown = true;     // so that it only happens once
+    switch (e->type()) {
+    case ElementType::SCORE:
+        return &EditStyle::PageScore;
+    case ElementType::PAGE:
+        return &EditStyle::PagePage;
+    case ElementType::TEXT:
+        if (toText(e)->tid() == Ms::Tid::FOOTER || toText(e)->tid() == Ms::Tid::HEADER) {
+            return &EditStyle::PageHeaderFooter;
+        }
+        return nullptr;
+    case ElementType::MEASURE_NUMBER:
+    case ElementType::MMREST_RANGE:
+        return &EditStyle::PageMeasureNumbers;
+    case ElementType::BRACKET:
+    case ElementType::BRACKET_ITEM:
+    case ElementType::SYSTEM_DIVIDER:
+        return &EditStyle::PageSystem;
+    case ElementType::CLEF:
+        return &EditStyle::PageClefs;
+    case ElementType::KEYSIG:
+        return &EditStyle::PageAccidentals;
+    case ElementType::MEASURE:
+        return &EditStyle::PageMeasure;
+    case ElementType::BAR_LINE:
+        return &EditStyle::PageBarlines;
+    case ElementType::NOTE:
+    case ElementType::CHORD:
+    case ElementType::ACCIDENTAL:
+    case ElementType::STEM:
+    case ElementType::STEM_SLASH:
+    case ElementType::LEDGER_LINE:
+        return &EditStyle::PageNotes;
+    case ElementType::REST:
+    case ElementType::MMREST:
+        return &EditStyle::PageRests;
+    case ElementType::MEASURE_REPEAT:
+        return &EditStyle::PageMeasureRepeats;
+    case ElementType::BEAM:
+        return &EditStyle::PageBeams;
+    case ElementType::TUPLET:
+        return &EditStyle::PageTuplets;
+    case ElementType::ARPEGGIO:
+        return &EditStyle::PageArpeggios;
+    case ElementType::SLUR:
+    case ElementType::SLUR_SEGMENT:
+    case ElementType::TIE:
+    case ElementType::TIE_SEGMENT:
+        return &EditStyle::PageSlursTies;
+    case ElementType::HAIRPIN:
+    case ElementType::HAIRPIN_SEGMENT:
+        return &EditStyle::PageHairpins;
+    case ElementType::VOLTA:
+    case ElementType::VOLTA_SEGMENT:
+        return &EditStyle::PageVolta;
+    case ElementType::OTTAVA:
+    case ElementType::OTTAVA_SEGMENT:
+        return &EditStyle::PageOttava;
+    case ElementType::PEDAL:
+    case ElementType::PEDAL_SEGMENT:
+        return &EditStyle::PagePedal;
+    case ElementType::TRILL:
+    case ElementType::TRILL_SEGMENT:
+        return &EditStyle::PageTrill;
+    case ElementType::VIBRATO:
+    case ElementType::VIBRATO_SEGMENT:
+        return &EditStyle::PageVibrato;
+    case ElementType::BEND:
+        return &EditStyle::PageBend;
+    case ElementType::TEXTLINE:
+    case ElementType::TEXTLINE_SEGMENT:
+        return &EditStyle::PageTextLine;
+    case ElementType::ARTICULATION:
+        return &EditStyle::PageArticulationsOrnaments;
+    case ElementType::FERMATA:
+        return &EditStyle::PageFermatas;
+    case ElementType::STAFF_TEXT:
+        return &EditStyle::PageStaffText;
+    case ElementType::TEMPO_TEXT:
+        return &EditStyle::PageTempoText;
+    case ElementType::LYRICS:
+    case ElementType::LYRICSLINE:
+    case ElementType::LYRICSLINE_SEGMENT:
+        return &EditStyle::PageLyrics;
+    case ElementType::DYNAMIC:
+        return &EditStyle::PageDynamics;
+    case ElementType::REHEARSAL_MARK:
+        return &EditStyle::PageRehearsalMarks;
+    case ElementType::FIGURED_BASS:
+        return &EditStyle::PageFiguredBass;
+    case ElementType::HARMONY:
+        return &EditStyle::PageChordSymbols;
+    case ElementType::FRET_DIAGRAM:
+        return &EditStyle::PageFretboardDiagrams;
+    default:
+        return nullptr;
     }
-    setValues();
-    pageList->setFocus();
-    globalContext()->currentNotation()->undoStack()->prepareChanges();
-    buttonApplyToAllParts->setEnabled(!globalContext()->currentNotation()->style()->canApplyToAllParts());
-    QWidget::showEvent(ev);
+}
+
+//--------------------------------------------------------
+//   arrayToString
+//--------------------------------------------------------
+
+std::string EditStyle::arrayToString(int* arr)
+{
+    std::string s;
+    for (int i = 0; i < numberOfPage; i++) {
+        s = s.append(std::to_string(arr[i]).append(","));
+    }
+    return s;
+}
+
+//--------------------------------------------------------
+//   stringToArray
+//--------------------------------------------------------
+
+void EditStyle::stringToArray(std::string s, int* arr)
+{
+    size_t j = 0;
+    std::string n = "";
+    for (size_t i = 0; i < s.length(); i++) {
+        if (s[i] == ',') {
+            arr[j] = stoi(n);
+            j++;
+            n = "";
+        } else {
+            n = n + s[i];
+        }
+    }
 }
 
 //---------------------------------------------------------
-//   hideEvent
+//   consecutiveStr
 //---------------------------------------------------------
 
-void EditStyle::hideEvent(QHideEvent* ev)
+std::string EditStyle::ConsecutiveStr(int D)
 {
-    WidgetStateStore::saveGeometry(this);
-    QWidget::hideEvent(ev);
+    std::string s;
+    for (int i = 0; i < D; i++) {
+        s = s.append(std::to_string(i).append(","));
+    }
+    return s;
+}
+
+//---------------------------------------------------------
+//   elementHasPage
+///   check if the element `e` has a style page related to it
+//---------------------------------------------------------
+
+bool EditStyle::elementHasPage(Element* e)
+{
+    return pageForElement(e) != nullptr;
+}
+
+//---------------------------------------------------------
+//   gotoElement
+///   switch to the page related to the element `e`
+//---------------------------------------------------------
+
+void EditStyle::gotoElement(Element* e)
+{
+    if (auto pagePointer = pageForElement(e)) {
+        if (QWidget* page = this->*pagePointer) {
+            setPage(pageStack->indexOf(page));
+        }
+    }
+}
+
+//---------------------------------------------------------
+//   setPage
+//---------------------------------------------------------
+
+void EditStyle::setPage(int idx)
+{
+    if (idx >= 0) {
+        pageList->setCurrentRow(idx);
+    }
+}
+
+//---------------------------------------------------------
+//   pageListRowChanged
+//---------------------------------------------------------
+
+void EditStyle::pageListRowChanged(int row)
+{
+    pageStack->setCurrentIndex(pageListMap[row]);
+}
+
+//---------------------------------------------------------
+//   pageListMoved
+//---------------------------------------------------------
+
+void EditStyle::pageListMoved(QModelIndex, int Start, int, QModelIndex, int End)
+{
+    if (End > Start) {
+        int startPageIndex = pageListMap[Start];
+        for (int i = Start; i < (End - 1); i++) {
+            pageListMap[i] = pageListMap[i + 1];
+        }
+        pageListMap[End - 1] = startPageIndex;
+    } else {
+        int startPageIndex = pageListMap[Start];
+        for (int i = Start; i > End; i--) {
+            pageListMap[i] = pageListMap[i - 1];
+        }
+        pageListMap[End] = startPageIndex;
+    }
+}
+
+//---------------------------------------------------------
+//   pageListResetOrder
+//---------------------------------------------------------
+
+void EditStyle::pageListResetOrder()
+{
+    QList<QString> originalOrder;
+    for (int i = 0; i < numberOfPage; i++) {
+        originalOrder.append(pageList->item(i)->text());
+    }
+    for (int i = 0; i < numberOfPage; i++) {
+        pageList->item(i)->setText(originalOrder[pageListMap[i]]);
+    }
 }
 
 //---------------------------------------------------------
@@ -779,20 +1252,40 @@ void EditStyle::buttonClicked(QAbstractButton* b)
 {
     switch (buttonBox->standardButton(b)) {
     case QDialogButtonBox::Ok:
-        done(1);
-        globalContext()->currentNotation()->undoStack()->commitChanges();
+        accept();
+        settings()->setSharedValue(STYLE_MENU_ORDER, Val(arrayToString(pageListMap)));
         break;
     case QDialogButtonBox::Cancel:
-        done(0);
-        globalContext()->currentNotation()->undoStack()->rollbackChanges();
+        reject();
         break;
-    case QDialogButtonBox::NoButton:
     default:
         if (b == buttonApplyToAllParts) {
             globalContext()->currentNotation()->style()->applyToAllParts();
         }
         break;
     }
+
+    globalContext()->currentNotation()->style()->styleChanged().notify();
+}
+
+//---------------------------------------------------------
+//   accept
+//---------------------------------------------------------
+
+void EditStyle::accept()
+{
+    globalContext()->currentNotation()->undoStack()->commitChanges();
+    QDialog::accept();
+}
+
+//---------------------------------------------------------
+//   reject
+//---------------------------------------------------------
+
+void EditStyle::reject()
+{
+    globalContext()->currentNotation()->undoStack()->rollbackChanges();
+    QDialog::reject();
 }
 
 //---------------------------------------------------------
@@ -822,6 +1315,25 @@ void EditStyle::on_buttonTogglePagelist_clicked()
 }
 
 //---------------------------------------------------------
+//    On resetStylesButton clicked
+//---------------------------------------------------------
+
+void EditStyle::on_resetStylesButton_clicked()
+{
+    NOT_IMPLEMENTED;
+}
+
+//---------------------------------------------------------
+//   unhandledType
+//---------------------------------------------------------
+
+void EditStyle::unhandledType(const StyleWidget sw)
+{
+    const char* type = Ms::MStyle::valueType(sw.idx);
+    qFatal("%s <%s>: widget: %s\n", type, Ms::MStyle::valueName(sw.idx), sw.widget->metaObject()->className());
+}
+
+//---------------------------------------------------------
 //   getValue
 //    return current gui value
 //---------------------------------------------------------
@@ -836,12 +1348,25 @@ QVariant EditStyle::getValue(StyleId idx)
         return QVariant(Ms::Spatium(sb->value() * (sw.showPercent ? 0.01 : 1.0)));
     } else if (!strcmp("double", type)) {
         QVariant v = sw.widget->property("value");
+        if (!v.isValid()) {
+            unhandledType(sw);
+        }
         if (sw.showPercent) {
             v = v.toDouble() * 0.01;
         }
         return v;
     } else if (!strcmp("bool", type)) {
-        return sw.widget->property("checked");
+        QVariant v;
+        if (sw.idx == StyleId::harmonyVoiceLiteral) { // special case for bool represented by a two-item combobox
+            QComboBox* cb = qobject_cast<QComboBox*>(sw.widget);
+            v = cb->currentIndex();
+        } else {
+            v = sw.widget->property("checked");
+            if (!v.isValid()) {
+                unhandledType(sw);
+            }
+        }
+        return v;
     } else if (!strcmp("int", type)) {
         if (qobject_cast<QComboBox*>(sw.widget)) {
             QComboBox* cb = qobject_cast<QComboBox*>(sw.widget);
@@ -868,12 +1393,12 @@ QVariant EditStyle::getValue(StyleId idx)
             QTextEdit* te = qobject_cast<QTextEdit*>(sw.widget);
             return te->toPlainText();
         }
-    } else if (!strcmp("QPointF", type)) {
+    } else if (!strcmp("mu::PointF", type)) {
         OffsetSelect* cb = qobject_cast<OffsetSelect*>(sw.widget);
         if (cb) {
-            return cb->offset();
+            return mu::PointF::fromQPointF(cb->offset());
         } else {
-            qFatal("unhandled QPointF");
+            qFatal("unhandled mu::PointF");
         }
     } else if (!strcmp("Ms::Direction", type)) {
         QComboBox* cb = qobject_cast<QComboBox*>(sw.widget);
@@ -917,12 +1442,19 @@ void EditStyle::setValues()
             if (sw.showPercent) {
                 val = QVariant(val.toDouble() * 100);
             }
-            sw.widget->setProperty("value", val);
+            if (!sw.widget->setProperty("value", val)) {
+                unhandledType(sw);
+            }
         } else if (!strcmp("bool", type)) {
-            sw.widget->setProperty("checked", val);
-
-            if (sw.idx == StyleId::measureNumberSystem && !val.toBool()) {
-                showIntervalMeasureNumber->setChecked(true);
+            if (sw.idx == StyleId::harmonyVoiceLiteral) { // special case for bool represented by a two-item combobox
+                voicingSelectWidget->interpretBox->setCurrentIndex(val.toBool());
+            } else {
+                if (!sw.widget->setProperty("checked", val)) {
+                    unhandledType(sw);
+                }
+                if (sw.idx == StyleId::measureNumberSystem && !val.toBool()) {
+                    showIntervalMeasureNumber->setChecked(true);
+                }
             }
         } else if (!strcmp("int", type)) {
             if (qobject_cast<QComboBox*>(sw.widget)) {
@@ -941,6 +1473,8 @@ void EditStyle::setValues()
                 }
             } else if (FontStyleSelect* fontStyle = qobject_cast<FontStyleSelect*>(sw.widget)) {
                 fontStyle->setFontStyle(Ms::FontStyle(val.toInt()));
+            } else {
+                unhandledType(sw);
             }
         } else if (!strcmp("QString", type)) {
             if (qobject_cast<QFontComboBox*>(sw.widget)) {
@@ -955,20 +1489,26 @@ void EditStyle::setValues()
                 }
             } else if (qobject_cast<QTextEdit*>(sw.widget)) {
                 static_cast<QTextEdit*>(sw.widget)->setPlainText(val.toString());
+            } else {
+                unhandledType(sw);
             }
         } else if (!strcmp("Ms::Direction", type)) {
             QComboBox* cb = qobject_cast<QComboBox*>(sw.widget);
             if (cb) {
                 cb->setCurrentIndex(int(val.value<Ms::Direction>()));
+            } else {
+                unhandledType(sw);
             }
         } else if (!strcmp("Ms::Align", type)) {
             AlignSelect* as = qobject_cast<AlignSelect*>(sw.widget);
             as->setAlign(val.value<Ms::Align>());
-        } else if (!strcmp("QPointF", type)) {
+        } else if (!strcmp("mu::PointF", type)) {
             OffsetSelect* as = qobject_cast<OffsetSelect*>(sw.widget);
             if (as) {
-                as->setOffset(val.value<QPointF>());
+                as->setOffset(val.value<mu::PointF>().toQPointF());
             }
+        } else {
+            unhandledType(sw);
         }
 
         if (sw.widget) {
@@ -1031,10 +1571,12 @@ void EditStyle::setValues()
     musicalTextFont->clear();
     // CAUTION: the second element, the itemdata, is a font family name!
     // It's also stored in score file as the musicalTextFont
+    musicalTextFont->addItem("Leland Text", "Leland Text");
     musicalTextFont->addItem("Bravura Text", "Bravura Text");
     musicalTextFont->addItem("Emmentaler Text", "MScore Text");
     musicalTextFont->addItem("Gonville Text", "Gootville Text");
     musicalTextFont->addItem("MuseJazz Text", "MuseJazz Text");
+    musicalTextFont->addItem("Petaluma Text", "Petaluma Text");
     QString tfont(styleValue(StyleId::MusicalTextFont).toString());
     idx = musicalTextFont->findData(tfont);
     musicalTextFont->setCurrentIndex(idx);
@@ -1042,6 +1584,7 @@ void EditStyle::setValues()
 
     toggleHeaderOddEven(styleValue(StyleId::headerOddEven).toBool());
     toggleFooterOddEven(styleValue(StyleId::footerOddEven).toBool());
+    disableVerticalSpread->setChecked(!styleValue(StyleId::enableVerticalSpread).toBool());
 }
 
 //---------------------------------------------------------
@@ -1050,10 +1593,10 @@ void EditStyle::setValues()
 
 void EditStyle::selectChordDescriptionFile()
 {
-    io::path dir = configuration()->stylesDirPath();
-    QString filter = mu::qtrc("notation", "MuseScore Styles") + " (*.mss)";
+    io::path dir = configuration()->userStylesPath();
+    QString filter = qtrc("notation", "MuseScore Styles") + " (*.mss)";
 
-    mu::io::path path = interactive()->selectOpeningFile(mu::qtrc("notation", "Load Style"), dir, filter);
+    mu::io::path path = interactive()->selectOpeningFile(qtrc("notation", "Load Style"), dir, filter);
     if (path.empty()) {
         return;
     }
@@ -1179,6 +1722,38 @@ void EditStyle::toggleHeaderOddEven(bool checked)
 }
 
 //---------------------------------------------------------
+//   enableStyleWidget
+//---------------------------------------------------------
+
+void EditStyle::enableStyleWidget(const StyleId idx, bool enable)
+{
+    const StyleWidget& sw { styleWidget(idx) };
+    static_cast<QWidget*>(sw.widget)->setEnabled(enable);
+    if (sw.reset) {
+        sw.reset->setEnabled(enable && hasDefaultStyleValue(idx));
+    }
+}
+
+//---------------------------------------------------------
+//   enableVerticalSpreadClicked
+//---------------------------------------------------------
+
+void EditStyle::enableVerticalSpreadClicked(bool checked)
+{
+    disableVerticalSpread->setChecked(!checked);
+}
+
+//---------------------------------------------------------
+//   disableVerticalSpreadClicked
+//---------------------------------------------------------
+
+void EditStyle::disableVerticalSpreadClicked(bool checked)
+{
+    setStyleValue(StyleId::enableVerticalSpread, !checked);
+    enableVerticalSpread->setChecked(!checked);
+}
+
+//---------------------------------------------------------
 //   toggleFooterOddEven
 //---------------------------------------------------------
 
@@ -1203,8 +1778,7 @@ void EditStyle::toggleFooterOddEven(bool checked)
 
 //---------------------------------------------------------
 //   lyricsDashMin/MaxLengthValueChanged
-//
-//    Ensure lyricsDashMinLength <= lyricsDashMaxLength
+///   Ensure lyricsDashMinLength <= lyricsDashMaxLength
 //---------------------------------------------------------
 
 void EditStyle::lyricsDashMaxLengthValueChanged(double val)
@@ -1225,8 +1799,7 @@ void EditStyle::lyricsDashMinLengthValueChanged(double val)
 
 //---------------------------------------------------------
 //   systemMin/MaxDistanceValueChanged
-//
-//    Ensure minSystemDistance <= maxSystemDistance
+///   Ensure minSystemDistance <= maxSystemDistance
 //---------------------------------------------------------
 
 void EditStyle::systemMaxDistanceValueChanged(double val)
@@ -1249,7 +1822,7 @@ void EditStyle::systemMinDistanceValueChanged(double val)
 //   styleWidget
 //---------------------------------------------------------
 
-const StyleWidget& EditStyle::styleWidget(StyleId idx) const
+const EditStyle::StyleWidget& EditStyle::styleWidget(StyleId idx) const
 {
     for (const StyleWidget& sw : styleWidgets) {
         if (sw.idx == idx) {
@@ -1274,7 +1847,7 @@ void EditStyle::valueChanged(int i)
     QVariant val  = getValue(idx);
     bool setValue = false;
     if (idx == StyleId::MusicalSymbolFont && optimizeStyleCheckbox->isChecked()) {
-        Ms::ScoreFont* scoreFont = Ms::ScoreFont::fontFactory(val.toString());
+        Ms::ScoreFont* scoreFont = Ms::ScoreFont::fontByName(val.toString());
         if (scoreFont) {
             for (auto j : scoreFont->engravingDefaults()) {
                 setStyleValue(j.first, j.second);
@@ -1350,6 +1923,11 @@ void EditStyle::textStyleChanged(int row)
         case Ms::Pid::FONT_SIZE:
             textStyleFontSize->setValue(styleValue(a.sid).toDouble());
             resetTextStyleFontSize->setEnabled(styleValue(a.sid) != defaultStyleValue(a.sid));
+            break;
+
+        case Ms::Pid::TEXT_LINE_SPACING:
+            textStyleLineSpacing->setValue(styleValue(a.sid).toDouble());
+            resetTextStyleLineSpacing->setEnabled(styleValue(a.sid) != defaultStyleValue(a.sid));
             break;
 
         case Ms::Pid::FONT_STYLE:

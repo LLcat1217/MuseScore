@@ -1,21 +1,22 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2020 MuseScore BVBA and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(MODULE languages)
 
@@ -29,12 +30,12 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/languagestypes.h
     ${CMAKE_CURRENT_LIST_DIR}/languageserrors.h
     ${CMAKE_CURRENT_LIST_DIR}/ilanguagesconfiguration.h
-    ${CMAKE_CURRENT_LIST_DIR}/ilanguagescontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/ilanguagesservice.h
     ${CMAKE_CURRENT_LIST_DIR}/ilanguageunpacker.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/languagesconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/languagesconfiguration.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/languagescontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/languagescontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/languagesservice.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/languagesservice.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/languageunpacker.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/languageunpacker.h
     ${CMAKE_CURRENT_LIST_DIR}/view/languagelistmodel.cpp

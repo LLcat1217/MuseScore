@@ -4,8 +4,11 @@
 *.autosave
 .qped
 .directory
+/builds
+/build_overrides.cmake
 build.release
 build.debug
+build.install
 build.qtc
 build-*
 win32build
@@ -26,6 +29,7 @@ MuseScorePortable
 *.qm
 share/manual/en
 share/manual/de
+/share/instruments/tsv
 Doc
 DocLib
 build.qt5

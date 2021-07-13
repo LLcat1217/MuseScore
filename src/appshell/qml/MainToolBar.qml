@@ -1,5 +1,28 @@
-import QtQuick 2.7
-import QtQuick.Controls 2.0
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+
+import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 
 Rectangle {
@@ -8,7 +31,11 @@ Rectangle {
     width: radioButtonList.contentWidth
     height: radioButtonList.contentHeight
 
-    property var currentUri: "musescore://home"
+    color: ui.theme.backgroundPrimaryColor
+
+    property alias navigation: keynavSub
+
+    property string currentUri: "musescore://home"
     property var items: [
         {
             title: qsTrc("appshell", "Home"),
@@ -19,16 +46,8 @@ Rectangle {
             uri: "musescore://notation"
         },
         {
-            title: qsTrc("appshell", "Sequencer"),
-            uri: "musescore://sequencer"
-        },
-        {
             title: qsTrc("appshell", "Publish"),
             uri: "musescore://publish"
-        },
-        {
-            title: qsTrc("appshell", "Settings"),
-            uri: "musescore://settings"
         },
         {
             title: qsTrc("appshell", "DevTools"),
@@ -39,7 +58,14 @@ Rectangle {
     signal selected(string uri)
 
     function select(uri) {
-        root.selected(uri);
+        root.selected(uri)
+    }
+
+    NavigationPanel {
+        id: keynavSub
+        name: "MainToolBar"
+        enabled: root.enabled && root.visible
+        accessible.name: qsTrc("appshell", "Main tool bar") + " " + keynavSub.directionInfo
     }
 
     RadioButtonGroup {
@@ -53,6 +79,13 @@ Rectangle {
             id: radioButtonDelegate
 
             ButtonGroup.group: radioButtonList.radioButtonGroup
+
+            spacing: 0
+            leftPadding: 12
+
+            navigation.name: modelData["title"]
+            navigation.panel: keynavSub
+            navigation.order: model.index
 
             checked: modelData["uri"] === root.currentUri
             title: modelData["title"]

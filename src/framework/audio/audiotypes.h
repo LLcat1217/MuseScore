@@ -1,119 +1,96 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #ifndef MU_AUDIO_AUDIOTYPES_H
 #define MU_AUDIO_AUDIOTYPES_H
 
+#include <variant>
+#include <memory>
 #include <string>
 
-#include "internal/audiointernaltypes.h"
+#include "midi/miditypes.h"
+#include "io/path.h"
+#include "async/channel.h"
 
-namespace mu {
-namespace audio {
-enum class PlayStatus {
-    UNDEFINED = 0,
-    STOPED,
-    PLAYING,
-    PAUSED
-};
+namespace mu::audio {
+using msecs_t = uint64_t;
+using samples_t = uint64_t;
+using audioch_t = uint8_t;
+using volume_db_t = float;
+using volume_dbfs_t = float;
+using gain_t = float;
+using balance_t = float;
 
-struct LoopRegion
-{
-    float begin = 0.0f;
-    float end = 0.0f;
+using TrackSequenceId = int32_t;
+using TrackSequenceIdList = std::vector<TrackSequenceId>;
 
-    bool isValid() const { return !(begin < 0.f) && end > begin; }
-};
+using TrackId = int32_t;
+using TrackIdList = std::vector<TrackId>;
+using TrackName = std::string;
 
-enum class CtxKey {
-    Silent = 0,
-    HasEnded = 1,
-    Position = 2,
-    InstanceDestroyed = 3,
+using MixerChannelId = int32_t;
 
-    // midi
-    PlayTick = 12,
-    FromTick = 13,
-    ToTick = 14,
-};
+using AudioSourceName = std::string;
 
-struct Context
-{
-    Args args;
+using FxProcessorId = std::string;
+using FxProcessorIdList =  std::vector<FxProcessorId>;
 
-    template<typename T>
-    void set(CtxKey k, const T& t)
+struct AudioOutputParams {
+    FxProcessorIdList fxProcessors;
+    volume_db_t volume = 1.f;
+    balance_t balance = 0.f;
+    bool isMuted = false;
+
+    bool operator ==(const AudioOutputParams& other) const
     {
-        args.setArg<T>(int(k), t);
-    }
-
-    template<typename T>
-    T get(CtxKey k, T def = T()) const
-    {
-        return args.arg<T>(int(k), def);
-    }
-
-    void clear()
-    {
-        args.clear();
-    }
-
-    void swap(Context& other)
-    {
-        args.swap(other.args);
-    }
-
-    bool hasVal(CtxKey k) const
-    {
-        return args.hasArg(int(k));
-    }
-
-    std::string dump() const
-    {
-        std::string str;
-        if (hasVal(CtxKey::Silent)) {
-            str += "Silent: " + std::to_string(get<bool>(CtxKey::Silent));
-        }
-
-        if (hasVal(CtxKey::HasEnded)) {
-            str += " HasEnded: " + std::to_string(get<bool>(CtxKey::HasEnded));
-        }
-
-        if (hasVal(CtxKey::Position)) {
-            str += " Position: " + std::to_string(get<double>(CtxKey::Position));
-        }
-
-        if (hasVal(CtxKey::PlayTick)) {
-            str += " PlayTick: " + std::to_string(get<int>(CtxKey::PlayTick));
-        }
-
-        if (hasVal(CtxKey::FromTick)) {
-            str += " FromTick: " + std::to_string(get<int>(CtxKey::FromTick));
-        }
-
-        if (hasVal(CtxKey::ToTick)) {
-            str += " ToTick: " + std::to_string(get<int>(CtxKey::ToTick));
-        }
-
-        return str;
+        return fxProcessors == other.fxProcessors
+               && volume == other.volume
+               && balance == other.balance
+               && isMuted == other.isMuted;
     }
 };
-}
+
+using AudioInputParams = std::variant<midi::MidiData, io::path>;
+
+struct AudioParams {
+    AudioInputParams in;
+    AudioOutputParams out;
+};
+
+struct AudioSignalChanges {
+    async::Channel<audioch_t, float> amplitudeChanges;
+    async::Channel<audioch_t, volume_dbfs_t> pressureChanges;
+};
+
+struct VolumePressureDbfsBoundaries {
+    volume_dbfs_t max = 0;
+    volume_dbfs_t min = -60;
+};
+
+enum class PlaybackStatus {
+    Stopped = 0,
+    Paused,
+    Running
+};
 }
 
 #endif // MU_AUDIO_AUDIOTYPES_H

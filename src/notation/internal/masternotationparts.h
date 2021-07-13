@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef MU_NOTATION_MASTERNOTATIONPARTS_H
 #define MU_NOTATION_MASTERNOTATIONPARTS_H
@@ -31,11 +34,12 @@ public:
 
     void setExcerpts(ExcerptNotationList excerpts);
 
-    void setInstruments(const instruments::InstrumentList& instruments) override;
+    void setParts(const PartInstrumentList& instruments) override;
+    void setScoreOrder(const ScoreOrder& order) override;
     void setInstrumentName(const ID& instrumentId, const ID& fromPartId, const QString& name) override;
     void setPartName(const ID& partId, const QString& name) override;
     void setPartSharpFlat(const ID& partId, const SharpFlat& sharpFlat) override;
-    void setPartTransposition(const ID& partId, const instruments::Interval& transpose) override;
+    void setPartTransposition(const ID& partId, const Interval& transpose) override;
     void setInstrumentAbbreviature(const ID& instrumentId, const ID& fromPartId, const QString& abbreviature) override;
     void setStaffType(const ID& staffId, StaffType type) override;
     void setCutawayEnabled(const ID& staffId, bool enabled) override;
@@ -52,12 +56,12 @@ public:
                          const ID& destinationInstrumentId, InsertMode mode = InsertMode::Before) override;
     void moveStaves(const IDList& sourceStavesIds, const ID& destinationStaffId, InsertMode mode = InsertMode::Before) override;
 
-    void appendDoublingInstrument(const instruments::Instrument& instrument, const ID& destinationPartId) override;
+    void appendDoublingInstrument(const Instrument& instrument, const ID& destinationPartId) override;
     void appendStaff(Staff* staff, const ID& destinationPartId) override;
 
     void cloneStaff(const ID& sourceStaffId, const ID& destinationStaffId) override;
 
-    void replaceInstrument(const ID& instrumentId, const ID& fromPartId, const instruments::Instrument& newInstrument) override;
+    void replaceInstrument(const ID& instrumentId, const ID& fromPartId, const Instrument& newInstrument) override;
 
 private:
     void startEdit();

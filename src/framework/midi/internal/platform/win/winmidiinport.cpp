@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "winmidiinport.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -52,25 +55,30 @@ static std::string errorString(MMRESULT ret)
 }
 }
 
-WinMidiInPort::WinMidiInPort()
-{
-    m_win = std::unique_ptr<Win>(new Win());
-}
-
 WinMidiInPort::~WinMidiInPort()
 {
-    if (isRunning()) {
-        stop();
-    }
-
     if (isConnected()) {
         disconnect();
     }
 }
 
-std::vector<MidiDevice> WinMidiInPort::devices() const
+void WinMidiInPort::init()
 {
-    std::vector<MidiDevice> ret;
+    m_win = std::unique_ptr<Win>(new Win());
+
+    m_devicesListener.startWithCallback([this]() {
+        return devices();
+    });
+
+    m_devicesListener.devicesChanged().onNotify(this, [this]() {
+        m_devicesChanged.notify();
+    });
+}
+
+MidiDeviceList WinMidiInPort::devices() const
+{
+    std::lock_guard lock(m_devicesMutex);
+    MidiDeviceList ret;
 
     unsigned int numDevs = midiInGetNumDevs();
     if (numDevs == 0) {
@@ -94,6 +102,11 @@ std::vector<MidiDevice> WinMidiInPort::devices() const
     return ret;
 }
 
+mu::async::Notification WinMidiInPort::devicesChanged() const
+{
+    return m_devicesChanged;
+}
+
 static void CALLBACK proccess(HMIDIIN hMidiIn, UINT wMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
     UNUSED(hMidiIn);
@@ -115,7 +128,7 @@ void WinMidiInPort::doProcess(uint32_t message, tick_t timing)
 {
     auto e = Event::fromMIDI10Package(message).toMIDI20();
     if (e) {
-        m_eventReceived.send({ timing, e });
+        m_eventReceived.send(timing, e);
     }
 }
 
@@ -151,6 +164,8 @@ void WinMidiInPort::disconnect()
     m_win->deviceID = -1;
 
     m_deviceID.clear();
+
+    stop();
 }
 
 bool WinMidiInPort::isConnected() const
@@ -200,7 +215,7 @@ bool WinMidiInPort::isRunning() const
     return m_running;
 }
 
-mu::async::Channel<std::pair<tick_t, Event> > WinMidiInPort::eventReceived() const
+mu::async::Channel<tick_t, Event> WinMidiInPort::eventReceived() const
 {
     return m_eventReceived;
 }

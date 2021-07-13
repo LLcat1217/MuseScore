@@ -1,9 +1,32 @@
-import QtQuick 2.9
-import QtQuick.Controls 2.1
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+import QtQuick 2.15
+import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.3
-import MuseScore.Ui 1.0
 
-Rectangle {
+import MuseScore.Ui 1.0
+import MuseScore.UiComponents 1.0
+
+FocusScope {
     id: root
 
     property bool isIndeterminate: false
@@ -16,33 +39,67 @@ Rectangle {
     property alias hintIcon: hintIcon.iconCode
     property bool clearTextButtonVisible: false
 
+    property bool hasText: valueInput.text.length > 0
+    property alias readOnly: valueInput.readOnly
+
+    property alias navigation: navCtrl
+    property alias accessible: navCtrl.accessible
+
     signal currentTextEdited(var newTextValue)
     signal textCleared()
 
     function selectAll() {
         valueInput.selectAll()
-        forceActiveFocus()
     }
 
     function clear() {
         valueInput.text = ""
+        currentText = ""
         textCleared()
     }
 
-    function forceActiveFocus() {
-        valueInput.forceActiveFocus()
+    function ensureActiveFocus() {
+        if (!root.activeFocus) {
+            root.forceActiveFocus()
+        }
+    }
+
+    onActiveFocusChanged: {
+        if (activeFocus) {
+            valueInput.forceActiveFocus()
+        }
     }
 
     implicitHeight: 30
     implicitWidth: parent.width
 
-    color: ui.theme.textFieldColor
-    border.color: ui.theme.strokeColor
-    border.width: 1
-
     opacity: root.enabled ? 1.0 : ui.theme.itemOpacityDisabled
 
-    radius: 4
+
+    NavigationControl {
+        id: navCtrl
+        name: root.objectName !== "" ? root.objectName : "TextInputField"
+        enabled: root.enabled && root.visible
+
+        accessible.role: MUAccessible.EditableText
+        accessible.name: valueInput.text
+        accessible.visualItem: root
+
+        onActiveChanged: {
+            if (navCtrl.active) {
+                root.ensureActiveFocus()
+            }
+        }
+    }
+
+    Rectangle {
+        id: background
+        anchors.fill: parent
+        color: ui.theme.textFieldColor
+        radius: 4
+        border.color: navCtrl.active ? ui.theme.focusColor : ui.theme.strokeColor
+        border.width: navCtrl.active ? 2 : 1
+    }
 
     RowLayout {
         anchors.fill: parent
@@ -57,14 +114,19 @@ Rectangle {
             Layout.fillHeight: true
             Layout.preferredWidth: 30
 
-            visible: Boolean(hintIcon.iconCode)
+            visible: Boolean(!hintIcon.isEmpty)
         }
 
         TextField {
             id: valueInput
 
+            objectName: "TextField"
+
             Layout.alignment: Qt.AlignVCenter
             Layout.fillWidth: !measureUnitsLabel.visible
+
+            //! NOTE Disabled default Qt Accessible
+            Accessible.role: Accessible.NoRole
 
             color: ui.theme.fontPrimaryColor
             font: ui.theme.bodyFont
@@ -74,7 +136,7 @@ Rectangle {
             focus: false
             activeFocusOnPress: false
             selectByMouse: true
-            selectionColor: Qt.rgba(ui.theme.accentColor.r, ui.theme.accentColor.g, ui.theme.accentColor.b, ui.theme.accentOpacityNormal)
+            selectionColor: Utils.colorWithAlpha(ui.theme.accentColor, ui.theme.accentOpacityNormal)
             selectedTextColor: ui.theme.fontPrimaryColor
             visible: !root.isIndeterminate || activeFocus
 
@@ -126,7 +188,7 @@ Rectangle {
             icon: IconCode.CLOSE_X_ROUNDED
             visible: root.clearTextButtonVisible
 
-            normalStateColor: root.color
+            normalStateColor: background.color
             hoveredStateColor: ui.theme.accentColor
             pressedStateColor: ui.theme.accentColor
 
@@ -143,8 +205,8 @@ Rectangle {
     StyledTextLabel {
         id: undefinedValueLabel
 
-        anchors.verticalCenter: root.verticalCenter
-        anchors.left: root.left
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: parent.left
         anchors.leftMargin: 12
 
         text: root.indeterminateText
@@ -155,26 +217,14 @@ Rectangle {
     states: [
         State {
             name: "HOVERED"
-            when: clickableArea.containsMouse && !valueInput.focus
-
-            PropertyChanges {
-                target: root
-                border.color: ui.theme.strokeColor
-                border.width: 1
-                opacity: 0.6
-            }
+            when: clickableArea.containsMouse && !valueInput.activeFocus
+            PropertyChanges { target: background; opacity: 0.6 }
         },
 
         State {
             name: "FOCUSED"
-            when: valueInput.focus
-
-            PropertyChanges {
-                target: root
-                border.color: ui.theme.accentColor
-                border.width: 1
-                opacity: 1
-            }
+            when: valueInput.activeFocus
+            PropertyChanges { target: background; border.color: ui.theme.accentColor; border.width: 1; opacity: 1 }
         }
     ]
 
@@ -191,10 +241,7 @@ Rectangle {
         hoverEnabled: true
 
         onPressed: {
-            if (!valueInput.activeFocus) {
-                valueInput.forceActiveFocus()
-            }
-
+            root.ensureActiveFocus()
             mouse.accepted = false
         }
     }

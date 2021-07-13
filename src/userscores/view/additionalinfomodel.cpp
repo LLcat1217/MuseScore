@@ -1,33 +1,91 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "additionalinfomodel.h"
-
-#include "libmscore/sym.h"
 
 #include "log.h"
 #include "translation.h"
-#include "ui/view/iconcodes.h"
-#include "ui/view/musicalsymbolcodes.h"
 
 using namespace mu::userscores;
-using namespace mu::framework;
 using namespace mu::notation;
+using namespace mu::ui;
+
+static const mu::notation::Fraction FOUR_FOUR_TIME_SIGNATURE(4, 4);
+static const mu::notation::Fraction ALLA_BREVE_TIME_SIGNATURE(2, 2);
+static const mu::notation::Fraction CUT_BACH_TIME_SIGNATURE(2, 2);
+static const mu::notation::Fraction CUT_TRIPLE_TIME_SIGNATURE(9, 8);
+static const mu::notation::Fraction DEFAULT_PICKUP_TIME_SIGNATURE(1, 4);
+
+static const QString VALUE_KEY("value");
+static const QString NOTE_ICON_KEY("noteIcon");
+static const QString NOTE_SYMBOL_KEY("noteSymbol");
+static const QString TITLE_MAJOR_KEY("titleMajor");
+static const QString TITLE_MINOR_KEY("titleMinor");
+static const QString ICON_KEY("icon");
+static const QString SIGNATURE_KEY("key");
+static const QString WITH_DOT_KEY("withDot");
+static const QString MIN_KEY("min");
+static const QString MAX_KEY("max");
+
+using MusicalSymbolCode = MusicalSymbolCodes::Code;
+
+AdditionalInfoModel::KeySignature::KeySignature(const QString& titleMajor, const QString& titleMinor, IconCode::Code icon, Key key)
+    : titleMajor(titleMajor), titleMinor(titleMinor), icon(icon), key(key)
+{
+}
+
+AdditionalInfoModel::KeySignature::KeySignature(const QVariantMap& map)
+{
+    titleMajor = map[TITLE_MAJOR_KEY].toString();
+    titleMinor = map[TITLE_MINOR_KEY].toString();
+    icon = static_cast<IconCode::Code>(map[ICON_KEY].toInt());
+    key = static_cast<Key>(map[SIGNATURE_KEY].toInt());
+}
+
+QVariantMap AdditionalInfoModel::KeySignature::toMap() const
+{
+    return {
+        { TITLE_MAJOR_KEY, titleMajor },
+        { TITLE_MINOR_KEY, titleMinor },
+        { ICON_KEY, static_cast<int>(icon) },
+        { SIGNATURE_KEY, static_cast<int>(key) }
+    };
+}
+
+AdditionalInfoModel::Tempo::Tempo(const QVariantMap& map)
+{
+    value = map[VALUE_KEY].toInt();
+    noteIcon = static_cast<MusicalSymbolCode>(map[NOTE_ICON_KEY].toInt());
+    withDot = map[WITH_DOT_KEY].toBool();
+}
+
+QVariantMap AdditionalInfoModel::Tempo::toMap() const
+{
+    return {
+        { VALUE_KEY, value },
+        { NOTE_ICON_KEY, static_cast<int>(noteIcon) },
+        { WITH_DOT_KEY, withDot },
+        { NOTE_SYMBOL_KEY, noteIconToString(noteIcon, withDot) }
+    };
+}
 
 AdditionalInfoModel::AdditionalInfoModel(QObject* parent)
     : QObject(parent)
@@ -36,65 +94,46 @@ AdditionalInfoModel::AdditionalInfoModel(QObject* parent)
 
 void AdditionalInfoModel::init()
 {
-    setKeySignature(KeySignature(qtrc("userscore", "None"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C, KeyMode::MAJOR).toMap());
+    setKeySignature(KeySignature(qtrc("userscore", "None"), qtrc("userscore", "None"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C).toMap());
 
-    setTimeSignatureType(static_cast<int>(TimeSignatureType::Common));
-    setTimeSignature(TimeSignature(4, 4).toMap());
+    setTimeSignatureType(static_cast<int>(TimeSignatureType::Fraction));
+    setTimeSignature(FOUR_FOUR_TIME_SIGNATURE);
 
     setWithTempo(false);
-    setTempo(120);
+
+    Tempo defaultTempo;
+    defaultTempo.noteIcon = MusicalSymbolCode::CROTCHET;
+    defaultTempo.value = 120;
+    setTempo(defaultTempo.toMap());
 
     setWithPickupMeasure(false);
     setMeasureCount(32);
-    setPickupTimeSignature(TimeSignature(4, 4).toMap());
+    setPickupTimeSignature(DEFAULT_PICKUP_TIME_SIGNATURE);
 }
 
-QVariantList AdditionalInfoModel::keySignatureMajorList()
+QVariantList AdditionalInfoModel::keySignatureList() const
 {
-    QVariantList majorList;
-    majorList << KeySignature(qtrc("userscore", "C major"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "F major"), IconCode::Code::KEY_SIGNATURE_1_FLAT, Key::F, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "Bb major"), IconCode::Code::KEY_SIGNATURE_2_FLAT, Key::B_B, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "Eb major"), IconCode::Code::KEY_SIGNATURE_3_FLAT, Key::E_B, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "Ab major"), IconCode::Code::KEY_SIGNATURE_4_FLAT, Key::A_B, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "Db major"), IconCode::Code::KEY_SIGNATURE_5_FLAT, Key::D_B, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "Gb major"), IconCode::Code::KEY_SIGNATURE_6_FLAT, Key::G_B, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "Cb major"), IconCode::Code::KEY_SIGNATURE_7_FLAT, Key::C_B, KeyMode::MAJOR).toMap()
+    QVariantList list = {
+        KeySignature(qtrc("userscore", "C major"), qtrc("userscore", "A minor"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C).toMap(),
+        KeySignature(qtrc("userscore", "F major"), qtrc("userscore", "D minor"), IconCode::Code::KEY_SIGNATURE_1_FLAT, Key::F).toMap(),
+        KeySignature(qtrc("userscore", "Bb major"), qtrc("userscore", "G minor"), IconCode::Code::KEY_SIGNATURE_2_FLAT, Key::B_B).toMap(),
+        KeySignature(qtrc("userscore", "Eb major"), qtrc("userscore", "C minor"), IconCode::Code::KEY_SIGNATURE_3_FLAT, Key::E_B).toMap(),
+        KeySignature(qtrc("userscore", "Ab major"), qtrc("userscore", "F minor"), IconCode::Code::KEY_SIGNATURE_4_FLAT, Key::A_B).toMap(),
+        KeySignature(qtrc("userscore", "Db major"), qtrc("userscore", "Bb minor"), IconCode::Code::KEY_SIGNATURE_5_FLAT, Key::D_B).toMap(),
+        KeySignature(qtrc("userscore", "Gb major"), qtrc("userscore", "Eb minor"), IconCode::Code::KEY_SIGNATURE_6_FLAT, Key::G_B).toMap(),
+        KeySignature(qtrc("userscore", "Cb major"), qtrc("userscore", "Ab minor"), IconCode::Code::KEY_SIGNATURE_7_FLAT, Key::C_B).toMap(),
+        KeySignature(qtrc("userscore", "None"), qtrc("userscore", "None"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C).toMap(),
+        KeySignature(qtrc("userscore", "G major"), qtrc("userscore", "E minor"), IconCode::Code::KEY_SIGNATURE_1_SHARP, Key::G).toMap(),
+        KeySignature(qtrc("userscore", "D major"), qtrc("userscore", "B minor"), IconCode::Code::KEY_SIGNATURE_2_SHARPS, Key::D).toMap(),
+        KeySignature(qtrc("userscore", "A major"), qtrc("userscore", "F# minor"), IconCode::Code::KEY_SIGNATURE_3_SHARPS, Key::A).toMap(),
+        KeySignature(qtrc("userscore", "E major"), qtrc("userscore", "C# minor"), IconCode::Code::KEY_SIGNATURE_4_SHARPS, Key::E).toMap(),
+        KeySignature(qtrc("userscore", "B major"), qtrc("userscore", "G# minor"), IconCode::Code::KEY_SIGNATURE_5_SHARPS, Key::B).toMap(),
+        KeySignature(qtrc("userscore", "F# major"), qtrc("userscore", "D# minor"), IconCode::Code::KEY_SIGNATURE_6_SHARPS,
+                     Key::F_S).toMap(),
+        KeySignature(qtrc("userscore", "C# major"), qtrc("userscore", "A# minor"), IconCode::Code::KEY_SIGNATURE_7_SHARPS, Key::C_S).toMap()
+    };
 
-              << KeySignature(qtrc("userscore", "None"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "G major"), IconCode::Code::KEY_SIGNATURE_1_SHARP, Key::G, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "D major"), IconCode::Code::KEY_SIGNATURE_2_SHARPS, Key::D, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "A major"), IconCode::Code::KEY_SIGNATURE_3_SHARPS, Key::A, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "E major"), IconCode::Code::KEY_SIGNATURE_4_SHARPS, Key::E, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "B major"), IconCode::Code::KEY_SIGNATURE_5_SHARPS, Key::B, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "F# major"), IconCode::Code::KEY_SIGNATURE_6_SHARPS, Key::F_S, KeyMode::MAJOR).toMap()
-              << KeySignature(qtrc("userscore", "C# major"), IconCode::Code::KEY_SIGNATURE_7_SHARPS, Key::C_S, KeyMode::MAJOR).toMap();
-
-    return majorList;
-}
-
-QVariantList AdditionalInfoModel::keySignatureMinorList()
-{
-    QVariantList minorList;
-    minorList << KeySignature(qtrc("userscore", "A minor"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "D minor"), IconCode::Code::KEY_SIGNATURE_1_FLAT, Key::F, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "G minor"), IconCode::Code::KEY_SIGNATURE_2_FLAT, Key::B_B, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "C minor"), IconCode::Code::KEY_SIGNATURE_3_FLAT, Key::E_B, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "F minor"), IconCode::Code::KEY_SIGNATURE_4_FLAT, Key::A_B, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "Bb minor"), IconCode::Code::KEY_SIGNATURE_5_FLAT, Key::D_B, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "Eb minor"), IconCode::Code::KEY_SIGNATURE_6_FLAT, Key::G_B, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "Ab minor"), IconCode::Code::KEY_SIGNATURE_7_FLAT, Key::C_B, KeyMode::MINOR).toMap()
-
-              << KeySignature(qtrc("userscore", "None"), IconCode::Code::KEY_SIGNATURE_NONE, Key::C, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "E minor"), IconCode::Code::KEY_SIGNATURE_1_SHARP, Key::G, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "B minor"), IconCode::Code::KEY_SIGNATURE_2_SHARPS, Key::D, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "F# minor"), IconCode::Code::KEY_SIGNATURE_3_SHARPS, Key::A, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "C# minor"), IconCode::Code::KEY_SIGNATURE_4_SHARPS, Key::E, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "G# minor"), IconCode::Code::KEY_SIGNATURE_5_SHARPS, Key::B, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "D# minor"), IconCode::Code::KEY_SIGNATURE_6_SHARPS, Key::F_S, KeyMode::MINOR).toMap()
-              << KeySignature(qtrc("userscore", "A# minor"), IconCode::Code::KEY_SIGNATURE_7_SHARPS, Key::C_S, KeyMode::MINOR).toMap();
-
-    return minorList;
+    return list;
 }
 
 QVariantMap AdditionalInfoModel::keySignature() const
@@ -104,6 +143,21 @@ QVariantMap AdditionalInfoModel::keySignature() const
 
 QVariantMap AdditionalInfoModel::timeSignature() const
 {
+    switch (m_timeSignatureType) {
+    case TimeSigType::FOUR_FOUR:
+        return FOUR_FOUR_TIME_SIGNATURE.toMap();
+    case TimeSigType::ALLA_BREVE:
+        return ALLA_BREVE_TIME_SIGNATURE.toMap();
+    case TimeSigType::CUT_BACH:
+        return CUT_BACH_TIME_SIGNATURE.toMap();
+        break;
+    case TimeSigType::CUT_TRIPLE:
+        return CUT_TRIPLE_TIME_SIGNATURE.toMap();
+        break;
+    case TimeSigType::NORMAL:
+        break;
+    }
+
     return m_timeSignature.toMap();
 }
 
@@ -112,39 +166,52 @@ int AdditionalInfoModel::timeSignatureType() const
     return static_cast<int>(m_timeSignatureType);
 }
 
-void AdditionalInfoModel::setTimeSignatureNumerator(int numerator)
+void AdditionalInfoModel::setTimeSignatureType(int timeSignatureType)
 {
-    if (m_timeSignature.numerator == numerator) {
+    TimeSigType type = static_cast<TimeSigType>(timeSignatureType);
+    if (m_timeSignatureType == type) {
         return;
     }
 
-    m_timeSignature.numerator = numerator;
-    setTimeSignature(m_timeSignature.toMap());
+    m_timeSignatureType = type;
+    emit timeSignatureChanged();
+}
+
+void AdditionalInfoModel::setTimeSignatureNumerator(int numerator)
+{
+    notation::Fraction newTimeSignature(numerator, m_timeSignature.denominator());
+    setTimeSignature(newTimeSignature);
 }
 
 void AdditionalInfoModel::setTimeSignatureDenominator(int denominator)
 {
-    if (m_timeSignature.denominator == denominator) {
+    notation::Fraction newTimeSignature(m_timeSignature.numerator(), denominator);
+    setTimeSignature(newTimeSignature);
+}
+
+void AdditionalInfoModel::setTimeSignature(const notation::Fraction& timeSignature)
+{
+    if (m_timeSignature == timeSignature) {
         return;
     }
 
-    m_timeSignature.denominator = denominator;
-    setTimeSignature(m_timeSignature.toMap());
+    m_timeSignature = timeSignature;
+    emit timeSignatureChanged();
 }
 
 QVariantList AdditionalInfoModel::musicSymbolCodes(int number) const
 {
-    static QMap<QChar, MusicalSymbolCodes::Code> numeralsMusicSymbolCodes = {
-        { '0', MusicalSymbolCodes::Code::ZERO },
-        { '1', MusicalSymbolCodes::Code::ONE },
-        { '2', MusicalSymbolCodes::Code::TWO },
-        { '3', MusicalSymbolCodes::Code::THREE },
-        { '4', MusicalSymbolCodes::Code::FOUR },
-        { '5', MusicalSymbolCodes::Code::FIVE },
-        { '6', MusicalSymbolCodes::Code::SIX },
-        { '7', MusicalSymbolCodes::Code::SEVEN },
-        { '8', MusicalSymbolCodes::Code::EIGHT },
-        { '9', MusicalSymbolCodes::Code::NINE },
+    static QMap<QChar, MusicalSymbolCode> numeralsMusicSymbolCodes = {
+        { '0', MusicalSymbolCode::ZERO },
+        { '1', MusicalSymbolCode::ONE },
+        { '2', MusicalSymbolCode::TWO },
+        { '3', MusicalSymbolCode::THREE },
+        { '4', MusicalSymbolCode::FOUR },
+        { '5', MusicalSymbolCode::FIVE },
+        { '6', MusicalSymbolCode::SIX },
+        { '7', MusicalSymbolCode::SEVEN },
+        { '8', MusicalSymbolCode::EIGHT },
+        { '9', MusicalSymbolCode::NINE },
     };
 
     QVariantList result;
@@ -156,35 +223,65 @@ QVariantList AdditionalInfoModel::musicSymbolCodes(int number) const
     return result;
 }
 
-int AdditionalInfoModel::tempo() const
-{
-    return m_tempo;
-}
-
 bool AdditionalInfoModel::withTempo() const
 {
     return m_withTempo;
 }
 
-QVariantMap AdditionalInfoModel::tempoRange()
+QVariantMap AdditionalInfoModel::tempo() const
 {
-    return QVariantMap { { "min", 20 }, { "max", 400 } };
+    return m_tempo.toMap();
 }
 
-QVariantList AdditionalInfoModel::tempoMarks()
+int AdditionalInfoModel::currentTempoNoteIndex() const
 {
-    QVariantList marks;
-    marks << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::SEMIQUAVER) } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::SEMIQUAVER) }, { "withDot", true } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::CROTCHET) } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::CROTCHET) }, { "withDot", true } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::QUAVER) } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::QUAVER) }, { "withDot", true } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::MINIM) } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::MINIM) }, { "withDot", true } }
-          << QVariantMap { { "icon", static_cast<int>(MusicalSymbolCodes::Code::SEMIBREVE) } };
+    QString selectedNoteSymbol = noteIconToString(m_tempo.noteIcon, m_tempo.withDot);
+    QVariantList notes = tempoNotes();
 
-    return marks;
+    for (int i = 0; i < notes.size(); ++i) {
+        QVariantMap note = notes[i].toMap();
+
+        if (note[NOTE_SYMBOL_KEY].toString() == selectedNoteSymbol) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+QVariantMap AdditionalInfoModel::tempoValueRange() const
+{
+    return QVariantMap { { MIN_KEY, 20 }, { MAX_KEY, 400 } };
+}
+
+QVariantList AdditionalInfoModel::tempoNotes() const
+{
+    auto makeNote = [](MusicalSymbolCodes::Code icon, bool withDot = false) {
+        QVariantMap note;
+        note[NOTE_ICON_KEY] = static_cast<int>(icon);
+        note[NOTE_SYMBOL_KEY] = noteIconToString(icon, withDot);
+
+        if (withDot) {
+            note[WITH_DOT_KEY] = withDot;
+        }
+
+        return note;
+    };
+
+    constexpr bool WITH_DOT = true;
+
+    QVariantList notes;
+    notes << makeNote(MusicalSymbolCode::SEMIQUAVER)
+          << makeNote(MusicalSymbolCode::SEMIQUAVER, WITH_DOT)
+          << makeNote(MusicalSymbolCode::QUAVER)
+          << makeNote(MusicalSymbolCode::QUAVER, WITH_DOT)
+          << makeNote(MusicalSymbolCode::CROTCHET)
+          << makeNote(MusicalSymbolCode::CROTCHET, WITH_DOT)
+          << makeNote(MusicalSymbolCode::MINIM)
+          << makeNote(MusicalSymbolCode::MINIM, WITH_DOT)
+          << makeNote(MusicalSymbolCode::SEMIBREVE);
+
+    return notes;
 }
 
 QVariantMap AdditionalInfoModel::pickupTimeSignature() const
@@ -194,22 +291,24 @@ QVariantMap AdditionalInfoModel::pickupTimeSignature() const
 
 void AdditionalInfoModel::setPickupTimeSignatureNumerator(int numerator)
 {
-    if (m_pickupTimeSignature.numerator == numerator) {
-        return;
-    }
-
-    m_pickupTimeSignature.numerator = numerator;
-    setPickupTimeSignature(m_pickupTimeSignature.toMap());
+    notation::Fraction newTimeSignature(numerator, m_pickupTimeSignature.denominator());
+    setPickupTimeSignature(newTimeSignature);
 }
 
 void AdditionalInfoModel::setPickupTimeSignatureDenominator(int denominator)
 {
-    if (m_pickupTimeSignature.denominator == denominator) {
+    notation::Fraction newTimeSignature(m_pickupTimeSignature.numerator(), denominator);
+    setPickupTimeSignature(newTimeSignature);
+}
+
+void AdditionalInfoModel::setPickupTimeSignature(const notation::Fraction& pickupTimeSignature)
+{
+    if (m_pickupTimeSignature == pickupTimeSignature) {
         return;
     }
 
-    m_pickupTimeSignature.denominator = denominator;
-    setPickupTimeSignature(m_pickupTimeSignature.toMap());
+    m_pickupTimeSignature = pickupTimeSignature;
+    emit pickupTimeSignatureChanged();
 }
 
 bool AdditionalInfoModel::withPickupMeasure() const
@@ -222,49 +321,34 @@ int AdditionalInfoModel::measureCount() const
     return m_measureCount;
 }
 
-QVariantMap AdditionalInfoModel::measureCountRange()
+QVariantMap AdditionalInfoModel::measureCountRange() const
 {
-    return QVariantMap { { "min", 1 }, { "max", 9999 } };
+    return QVariantMap { { MIN_KEY, 1 }, { MAX_KEY, 9999 } };
 }
 
-QVariantList AdditionalInfoModel::timeSignatureDenominators()
+QVariantList AdditionalInfoModel::timeSignatureDenominators() const
 {
     return QVariantList { 1, 2, 4, 8, 16, 32, 64 };
 }
 
 void AdditionalInfoModel::setKeySignature(QVariantMap keySignature)
 {
+    if (m_keySignature.toMap() == keySignature) {
+        return;
+    }
+
     m_keySignature = KeySignature(keySignature);
     emit keySignatureChanged(keySignature);
 }
 
-void AdditionalInfoModel::setTimeSignature(QVariantMap timeSignature)
+void AdditionalInfoModel::setTempo(QVariantMap tempo)
 {
-    m_timeSignature = TimeSignature(timeSignature);
-    emit timeSignatureChanged(timeSignature);
-}
-
-void AdditionalInfoModel::setTimeSignatureType(int timeSignatureType)
-{
-    TimeSigType type = static_cast<TimeSigType>(timeSignatureType);
-    if (m_timeSignatureType == type) {
+    if (m_tempo.toMap() == tempo) {
         return;
     }
 
-    m_timeSignatureType = type;
-    emit timeSignatureTypeChanged(timeSignatureType);
-
-    updateTimeSignature();
-}
-
-void AdditionalInfoModel::setTempo(int tempo)
-{
-    if (m_tempo == tempo) {
-        return;
-    }
-
-    m_tempo = tempo;
-    emit tempoChanged(m_tempo);
+    m_tempo = Tempo(tempo);
+    emit tempoChanged(tempo);
 }
 
 void AdditionalInfoModel::setWithTempo(bool withTempo)
@@ -275,12 +359,6 @@ void AdditionalInfoModel::setWithTempo(bool withTempo)
 
     m_withTempo = withTempo;
     emit withTempoChanged(m_withTempo);
-}
-
-void AdditionalInfoModel::setPickupTimeSignature(QVariantMap pickupTimeSignature)
-{
-    m_pickupTimeSignature = TimeSignature(pickupTimeSignature);
-    emit pickupTimeSignatureChanged(pickupTimeSignature);
 }
 
 void AdditionalInfoModel::setWithPickupMeasure(bool withPickupMeasure)
@@ -301,18 +379,4 @@ void AdditionalInfoModel::setMeasureCount(int measureCount)
 
     m_measureCount = measureCount;
     emit measureCountChanged(m_measureCount);
-}
-
-void AdditionalInfoModel::updateTimeSignature()
-{
-    switch (m_timeSignatureType) {
-    case TimeSigType::FOUR_FOUR:
-        setTimeSignature(TimeSignature(4, 4).toMap());
-        break;
-    case TimeSigType::ALLA_BREVE:
-        setTimeSignature(TimeSignature(2, 2).toMap());
-        break;
-    case TimeSigType::NORMAL:
-        break;
-    }
 }

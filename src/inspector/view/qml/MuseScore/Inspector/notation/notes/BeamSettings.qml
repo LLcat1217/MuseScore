@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.0
 import QtQuick.Controls 2.0
 import MuseScore.Inspector 1.0
@@ -24,7 +45,7 @@ FocusableItem {
 
         InspectorPropertyView {
 
-            titleText: qsTr("Beam types")
+            titleText: qsTrc("inspector", "Beam types")
             propertyItem: beamModesModel ? beamModesModel.mode : null
 
             BeamTypesGrid {
@@ -60,7 +81,7 @@ FocusableItem {
                                              : false
 
                 StyledTextLabel {
-                    text: qsTr("Feathered beams")
+                    text: qsTrc("inspector", "Feathered beams")
                 }
 
                 RadioButtonGroup {
@@ -103,7 +124,7 @@ FocusableItem {
                         anchors.right: parent.horizontalCenter
                         anchors.rightMargin: 4
 
-                        titleText: qsTr("Feathering left")
+                        titleText: qsTrc("inspector", "Feathering left")
                         propertyItem: model ? model.featheringHeightLeft : null
 
                         IncrementalPropertyControl {
@@ -124,7 +145,7 @@ FocusableItem {
                         anchors.leftMargin: 4
                         anchors.right: parent.right
 
-                        titleText: qsTr("Feathering right")
+                        titleText: qsTrc("inspector", "Feathering right")
                         propertyItem: model ? model.featheringHeightRight : null
 
                         IncrementalPropertyControl {
@@ -151,7 +172,7 @@ FocusableItem {
             FlatButton {
                 width: parent.width
 
-                text: qsTr("Force horizontal")
+                text: qsTrc("inspector", "Force horizontal")
 
                 onClicked: {
                     if (!model)
@@ -164,7 +185,7 @@ FocusableItem {
             ExpandableBlank {
                 isExpanded: false
 
-                title: isExpanded ? qsTr("Show less") : qsTr("Show more")
+                title: isExpanded ? qsTrc("inspector", "Show less") : qsTrc("inspector", "Show more")
 
                 width: parent.width
 
@@ -176,7 +197,7 @@ FocusableItem {
 
                     InspectorPropertyView {
 
-                        titleText: qsTr("Beam height")
+                        titleText: qsTrc("inspector", "Beam height")
                         propertyItem: model ? model.beamVectorX : null
 
                         Item {
@@ -197,7 +218,7 @@ FocusableItem {
                                 onValueEdited: { model.beamVectorX.value = newValue }
                             }
 
-                            FlatToogleButton {
+                            FlatToggleButton {
                                 id: lockButton
 
                                 anchors.horizontalCenter: parent.horizontalCenter

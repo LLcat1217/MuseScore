@@ -1,89 +1,117 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "msczmetareader.h"
 
 #include <sstream>
 
-#include <QFileInfo>
 #include <QBuffer>
 
-#include "log.h"
 #include "stringutils.h"
 #include "notationerrors.h"
 
-#include "thirdparty/qzip/qzipreader_p.h"
-
 #include "framework/global/xmlreader.h"
 
-using namespace mu;
+#include "engraving/io/msczreader.h"
+
+#include "log.h"
+
 using namespace mu::notation;
 using namespace mu::framework;
+using namespace mu::system;
+using namespace mu::engraving;
 
-RetVal<Meta> MsczMetaReader::readMeta(const io::path& filePath) const
+MetaList MsczMetaReader::readMetaList(const io::paths& filePaths) const
+{
+    MetaList result;
+
+    for (const io::path& path: filePaths) {
+        RetVal<Meta> meta = readMeta(path);
+
+        if (!meta.ret) {
+            LOGE() << meta.ret.toString();
+            continue;
+        }
+
+        result.push_back(meta.val);
+    }
+
+    return result;
+}
+
+mu::RetVal<Meta> MsczMetaReader::readMeta(const io::path& filePath) const
 {
     RetVal<Meta> meta;
 
-    QFileInfo fileInfo(filePath.toQString());
-    if (!fileInfo.exists()) {
+    if (!fileSystem()->exists(filePath)) {
         LOGE() << "File not exists: " << filePath;
         meta.ret = make_ret(Err::FileNotFound);
         return meta;
     }
 
-    bool compressed = fileInfo.suffix() == "mscz";
+    bool compressed = io::syffix(filePath) == "mscz";
 
     if (compressed) {
-        meta = loadCompressedMsc(filePath);
+        meta = readMetaFromMscx(filePath);
     } else {
         framework::XmlReader reader(filePath);
         meta = doReadMeta(reader);
     }
 
-    if (meta.val.fileName.isEmpty()) {
-        meta.val.fileName = fileInfo.baseName();
+    if (meta.val.fileName.empty()) {
+        meta.val.fileName = io::basename(filePath);
     }
 
-    meta.val.filePath = fileInfo.absoluteFilePath();
+    meta.val.filePath = filePath;
 
     return meta;
 }
 
-RetVal<Meta> MsczMetaReader::loadCompressedMsc(const io::path& filePath) const
+mu::RetVal<Meta> MsczMetaReader::readMetaFromMscx(const io::path& filePath) const
 {
     RetVal<Meta> meta;
 
-    QFile file(filePath.toQString());
-    if (!file.open(QIODevice::ReadOnly)) {
-        LOGE() << "Failed open file: " << filePath;
-        meta.ret = make_ret(Err::FileOpenError);
+    RetVal<QByteArray> data = fileSystem()->readFile(filePath);
+    if (!data.ret) {
+        meta.ret = data.ret;
         return meta;
     }
 
-    QByteArray data = file.readAll();
+    QBuffer buffer(&data.val);
+    MsczReader msczReader(&buffer);
+    msczReader.open();
 
-    QBuffer buffer(&data);
+    // Read score meta
+    QByteArray scoreData = msczReader.readScore();
 
-    MQZipReader zipReader(&buffer);
-
-    io::path rootFile = readRootFile(&zipReader);
-    if (rootFile.empty()) {
-        meta.ret = make_ret(Err::FileNoRootFile);
-        return meta;
-    }
-
-    QByteArray rootBuffer = zipReader.fileData(rootFile.toQString());
-    if (rootBuffer.isEmpty()) {
-        auto fil = zipReader.fileInfoList();
-        for (const MQZipReader::FileInfo& fi : fil) {
-            if (mu::strings::endsWith(fi.filePath.toStdString(), ".mscx")) {
-                rootBuffer = zipReader.fileData(fi.filePath);
-                break;
-            }
-        }
-    }
-
-    framework::XmlReader xmlReader(rootBuffer);
+    framework::XmlReader xmlReader(scoreData);
     meta = doReadMeta(xmlReader);
 
-    meta.val.thumbnail = loadThumbnail(&zipReader);
+    // Read thumbnail
+    QByteArray thumbnailData = msczReader.readThumbnail();
+    if (thumbnailData.isEmpty()) {
+        LOGD() << "Can't find thumbnail";
+    } else {
+        meta.val.thumbnail.loadFromData(thumbnailData, "PNG");
+    }
 
     return meta;
 }
@@ -217,7 +245,7 @@ MsczMetaReader::RawMeta MsczMetaReader::doReadRawMeta(framework::XmlReader& xmlR
     return meta;
 }
 
-RetVal<Meta> MsczMetaReader::doReadMeta(framework::XmlReader& xmlReader) const
+mu::RetVal<Meta> MsczMetaReader::doReadMeta(framework::XmlReader& xmlReader) const
 {
     RawMeta rawMeta;
 
@@ -282,61 +310,6 @@ RetVal<Meta> MsczMetaReader::doReadMeta(framework::XmlReader& xmlReader) const
     meta.val.creationDate = QDate::fromString(rawMeta.creationDate, "yyyy-MM-dd");
 
     return meta;
-}
-
-io::path MsczMetaReader::readRootFile(MQZipReader* zipReader) const
-{
-    io::path rootFile;
-
-    QByteArray containerBuffer = zipReader->fileData("META-INF/container.xml");
-    if (containerBuffer.isEmpty()) {
-        LOGD() << "Can't find container.xml";
-        return rootFile;
-    }
-
-    framework::XmlReader reader(containerBuffer);
-
-    while (reader.readNextStartElement()) {
-        if (reader.tagName() != "container") {
-            reader.skipCurrentElement();
-            continue;
-        }
-
-        while (reader.readNextStartElement()) {
-            if (reader.tagName() != "rootfiles") {
-                reader.skipCurrentElement();
-                continue;
-            }
-
-            while (reader.readNextStartElement()) {
-                if (reader.tagName() == "rootfile") {
-                    if (rootFile.empty()) {
-                        rootFile = reader.attribute("full-path");
-                        reader.skipCurrentElement();
-                    }
-                } else {
-                    reader.skipCurrentElement();
-                }
-            }
-        }
-    }
-
-    return rootFile;
-}
-
-QPixmap MsczMetaReader::loadThumbnail(MQZipReader* zipReader) const
-{
-    QByteArray thumbnailBuffer = zipReader->fileData("Thumbnails/thumbnail.png");
-
-    if (thumbnailBuffer.isEmpty()) {
-        LOGD() << "Can't find thumbnail";
-        return QPixmap();
-    }
-
-    QPixmap thumbnail;
-    thumbnail.loadFromData(thumbnailBuffer, "PNG");
-
-    return thumbnail;
 }
 
 QString MsczMetaReader::formatFromXml(const std::string& xml) const

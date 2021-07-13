@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
+#
+# MuseScore
+# Music Composition & Notation
+#
+# Copyright (C) 2021 MuseScore BVBA and others
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # For maximum AppImage compatibility, build on the oldest Linux distribution
 # that still receives security updates from its manufacturer.
@@ -60,7 +79,6 @@ apt_packages_runtime=(
   libegl1-mesa-dev
   libodbc1
   libpq-dev
-  libssl1.0.0
   libxcomposite-dev
   libxcursor-dev
   libxi-dev
@@ -86,7 +104,7 @@ apt-get install -y --no-install-recommends \
 ##########################################################################
 
 # Get newer Qt (only used cached version if it is the same)
-qt_version="5151"
+qt_version="5152"
 qt_dir="Qt/${qt_version}"
 if [[ ! -d "${qt_dir}" ]]; then
   mkdir -p "${qt_dir}"
@@ -133,6 +151,15 @@ fi
 echo export PATH="${PWD%/}/${cmake_dir}/bin:\${PATH}" >> ${ENV_FILE}
 export PATH="${PWD%/}/${cmake_dir}/bin:${PATH}"
 cmake --version
+
+# Ninja
+echo "Get Ninja"
+mkdir -p $HOME/build_tools/Ninja
+wget -q --show-progress -O $HOME/build_tools/Ninja/ninja "https://s3.amazonaws.com/utils.musescore.org/build_tools/linux/Ninja/ninja"
+chmod +x $HOME/build_tools/Ninja/ninja
+echo export PATH="$HOME/build_tools/Ninja:\${PATH}" >> ${ENV_FILE}
+echo "ninja version"
+$HOME/build_tools/Ninja/ninja --version
 
 # Dump syms
 wget -q --show-progress -O dump_syms.7z "https://s3.amazonaws.com/utils.musescore.org/breakpad/linux/x86-64/dump_syms.7z"

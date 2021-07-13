@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
@@ -23,7 +44,7 @@ FocusableItem {
         CheckBox {
             isIndeterminate: root.model ? root.model.isLineVisible.isUndefined : false
             checked: root.model && !isIndeterminate ? root.model.isLineVisible.value : false
-            text: qsTr("Show line")
+            text: qsTrc("inspector", "Show line")
 
             onClicked: { root.model.isLineVisible.value = !checked }
         }
@@ -31,7 +52,7 @@ FocusableItem {
         InspectorPropertyView {
             width: parent.width
 
-            titleText: qsTr("Line type")
+            titleText: qsTrc("inspector", "Line type")
             propertyItem: root.model ? root.model.endHookType : null
 
             enabled: root.model && root.model.endHookType.isEnabled
@@ -70,7 +91,7 @@ FocusableItem {
         SeparatorLine { anchors.margins: -10 }
 
         InspectorPropertyView {
-            titleText:  qsTr("Style")
+            titleText:  qsTrc("inspector", "Style")
             propertyItem: root.model ? root.model.lineStyle : null
 
             enabled: root.model && root.model.lineStyle.isEnabled
@@ -115,7 +136,7 @@ FocusableItem {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
-                titleText: qsTr("Dash")
+                titleText: qsTrc("inspector", "Dash")
                 propertyItem: root.model ? root.model.dashLineLength : null
 
                 visible: root.model ? root.model.dashLineLength.isEnabled : false
@@ -140,7 +161,7 @@ FocusableItem {
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
-                titleText: qsTr("Gap")
+                titleText: qsTrc("inspector", "Gap")
                 propertyItem: root.model ? root.model.dashGapLength : null
 
                 visible: root.model ? root.model.dashGapLength.isEnabled : false
@@ -164,7 +185,7 @@ FocusableItem {
         ExpandableBlank {
             isExpanded: false
 
-            title: isExpanded ? qsTr("Show less") : qsTr("Show more")
+            title: isExpanded ? qsTrc("inspector", "Show less") : qsTrc("inspector", "Show more")
 
             width: parent.width
 
@@ -183,7 +204,7 @@ FocusableItem {
                         anchors.right: parent.horizontalCenter
                         anchors.rightMargin: 2
 
-                        titleText: qsTr("Thickness")
+                        titleText: qsTrc("inspector", "Thickness")
                         propertyItem: root.model ? root.model.thickness : null
 
                         enabled: root.model && root.model.thickness.isEnabled
@@ -207,7 +228,7 @@ FocusableItem {
                         anchors.leftMargin: 2
                         anchors.right: parent.right
 
-                        titleText: qsTr("Hook height")
+                        titleText: qsTrc("inspector", "Hook height")
                         propertyItem: root.model ? root.model.hookHeight : null
 
                         enabled: root.model && root.model.hookHeight.isEnabled
@@ -229,7 +250,7 @@ FocusableItem {
                 }
 
                 InspectorPropertyView {
-                    titleText: qsTr("Position")
+                    titleText: qsTrc("inspector", "Position")
                     propertyItem: root.model ? root.model.placement : null
 
                     RadioButtonGroup {
@@ -239,8 +260,8 @@ FocusableItem {
                         width: parent.width
 
                         model: [
-                            { textRole: qsTr("Above"), valueRole: CrescendoTypes.PLACEMENT_TYPE_ABOVE },
-                            { textRole: qsTr("Below"), valueRole: CrescendoTypes.PLACEMENT_TYPE_BELOW }
+                            { textRole: qsTrc("inspector", "Above"), valueRole: CrescendoTypes.PLACEMENT_TYPE_ABOVE },
+                            { textRole: qsTrc("inspector", "Below"), valueRole: CrescendoTypes.PLACEMENT_TYPE_BELOW }
                         ]
 
                         delegate: FlatRadioButton {

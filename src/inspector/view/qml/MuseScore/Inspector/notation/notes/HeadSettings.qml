@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.0
 import QtQuick.Controls 2.0
 import MuseScore.Inspector 1.0
@@ -24,14 +45,15 @@ FocusableItem {
         CheckBox {
             isIndeterminate: model ? model.isHeadHidden.isUndefined : false
             checked: model && !isIndeterminate ? model.isHeadHidden.value : false
-            text: qsTr("Hide notehead")
+            text: qsTrc("inspector", "Hide notehead")
 
             onClicked: { model.isHeadHidden.value = !checked }
         }
 
         InspectorPropertyView {
-            titleText: qsTr("Noteheads")
+            titleText: qsTrc("inspector", "Noteheads")
             propertyItem: root.model ? root.model.headGroup : null
+            height: 120
 
             NoteheadsGrid {
                 id: noteheadGridView
@@ -42,7 +64,7 @@ FocusableItem {
 
         InspectorPropertyView {
 
-            titleText: qsTr("Dotted note position")
+            titleText: qsTrc("inspector", "Dotted note position")
             propertyItem: root.model ? root.model.dotPosition : null
 
             RadioButtonGroup {
@@ -78,7 +100,7 @@ FocusableItem {
         ExpandableBlank {
             isExpanded: false
 
-            title: isExpanded ? qsTr("Show less") : qsTr("Show more")
+            title: isExpanded ? qsTrc("inspector", "Show less") : qsTrc("inspector", "Show more")
 
             width: parent.width
 
@@ -92,7 +114,7 @@ FocusableItem {
                     width: root.width
                     height: implicitHeight
 
-                    titleText: qsTr("Head type (visual only)")
+                    titleText: qsTrc("inspector", "Head type (visual only)")
                     propertyItem: root.model ? root.model.headType : null
 
                     RadioButtonGroup {
@@ -133,7 +155,7 @@ FocusableItem {
                     width: root.width
                     height: implicitHeight
 
-                    titleText: qsTr("Note direction")
+                    titleText: qsTrc("inspector", "Note direction")
                     propertyItem: root.model ? root.model.headDirection : null
 
                     RadioButtonGroup {
@@ -170,7 +192,7 @@ FocusableItem {
                     height: childrenRect.height
                     width: parent.width
 
-                    titleText: qsTr("Notehead offset")
+                    titleText: qsTrc("inspector", "Notehead offset")
                     propertyItem: model ? model.horizontalOffset : null
 
                     Item {

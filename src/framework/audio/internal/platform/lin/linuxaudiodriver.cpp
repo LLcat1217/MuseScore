@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "linuxaudiodriver.h"
 
 #define ALSA_PCM_NEW_HW_PARAMS_API
@@ -91,7 +112,7 @@ std::string LinuxAudioDriver::name() const
 bool LinuxAudioDriver::open(const Spec& spec, Spec* activeSpec)
 {
     _alsaData = new ALSAData;
-    _alsaData->audioProcessingDone = 0;
+    memset(_alsaData, 0, sizeof(ALSAData));
     _alsaData->samples = spec.samples;
     _alsaData->channels = spec.channels;
     _alsaData->callback = spec.callback;
@@ -115,7 +136,7 @@ bool LinuxAudioDriver::open(const Spec& spec, Spec* activeSpec)
     snd_pcm_hw_params_set_channels(handle, params, spec.channels);
     snd_pcm_hw_params_set_buffer_size(handle, params, spec.samples);
 
-    unsigned int aSamplerate = spec.freq;
+    unsigned int aSamplerate = spec.sampleRate;
     unsigned int val = aSamplerate;
     int dir = 0;
     rc = snd_pcm_hw_params_set_rate_near(handle, params, &val, &dir);
@@ -137,7 +158,7 @@ bool LinuxAudioDriver::open(const Spec& spec, Spec* activeSpec)
     if (activeSpec) {
         *activeSpec = spec;
         activeSpec->format = Format::AudioF32;
-        activeSpec->freq = aSamplerate;
+        activeSpec->sampleRate = aSamplerate;
     }
 
     _alsaData->threadHandle = 0;
@@ -158,4 +179,37 @@ void LinuxAudioDriver::close()
 bool LinuxAudioDriver::isOpened() const
 {
     return _alsaData != nullptr;
+}
+
+std::string LinuxAudioDriver::outputDevice() const
+{
+    NOT_IMPLEMENTED;
+    return "default";
+}
+
+bool LinuxAudioDriver::selectOutputDevice(const std::string& name)
+{
+    UNUSED(name);
+    NOT_IMPLEMENTED;
+    return false;
+}
+
+std::vector<std::string> LinuxAudioDriver::availableOutputDevices() const
+{
+    NOT_IMPLEMENTED;
+    return { "default" };
+}
+
+mu::async::Notification LinuxAudioDriver::availableOutputDevicesChanged() const
+{
+    NOT_IMPLEMENTED;
+    return mu::async::Notification();
+}
+
+void LinuxAudioDriver::resume()
+{
+}
+
+void LinuxAudioDriver::suspend()
+{
 }

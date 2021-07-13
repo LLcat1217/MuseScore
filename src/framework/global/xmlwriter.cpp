@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "xmlwriter.h"
 
@@ -23,21 +26,22 @@
 #include <QFile>
 
 using namespace mu::framework;
+using namespace mu::io;
 
 XmlWriter::XmlWriter(const io::path& path)
 {
     m_device = std::make_unique<QFile>(path.toQString());
-    m_device->open(IODevice::WriteOnly);
+    m_device->open(Device::WriteOnly);
 
     initWriter(m_device.get());
 }
 
-XmlWriter::XmlWriter(IODevice* device)
+XmlWriter::XmlWriter(Device* device)
 {
     initWriter(device);
 }
 
-void XmlWriter::initWriter(IODevice* device)
+void XmlWriter::initWriter(Device* device)
 {
     m_writer = std::make_unique<QXmlStreamWriter>(device);
     m_writer->setAutoFormatting(true);

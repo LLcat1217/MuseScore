@@ -1,16 +1,36 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
 import MuseScore.UiComponents 1.0
 import "../../common"
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property QtObject model: null
 
-    implicitHeight: contentColumn.implicitHeight + topPadding + bottomPadding
-    width: parent.width
+    contentHeight: contentColumn.implicitHeight
 
     Column {
         id: contentColumn
@@ -20,34 +40,33 @@ StyledPopup {
         spacing: 12
 
         InspectorPropertyView {
-            titleText: qsTr("Bend type")
+            titleText: qsTrc("inspector", "Bend type")
             propertyItem: root.model ? root.model.bendType : null
 
-            StyledComboBox {
+            Dropdown {
+                id: btypes
+
                 width: parent.width
 
-                textRoleName: "text"
-                valueRoleName: "value"
-
                 model: [
-                    { text: qsTr("Bend"), value: BendTypes.TYPE_BEND },
-                    { text: qsTr("Bend/Release"), value: BendTypes.TYPE_BEND_RELEASE },
-                    { text: qsTr("Bend/Release/Bend"), value: BendTypes.TYPE_BEND_RELEASE_BEND },
-                    { text: qsTr("Prebend"), value: BendTypes.TYPE_PREBEND },
-                    { text: qsTr("Prebend/Release"), value: BendTypes.TYPE_PREBEND_RELEASE },
-                    { text: qsTr("Custom"), value: BendTypes.TYPE_CUSTOM }
+                    { text: qsTrc("inspector", "Bend"), value: BendTypes.TYPE_BEND },
+                    { text: qsTrc("inspector", "Bend/Release"), value: BendTypes.TYPE_BEND_RELEASE },
+                    { text: qsTrc("inspector", "Bend/Release/Bend"), value: BendTypes.TYPE_BEND_RELEASE_BEND },
+                    { text: qsTrc("inspector", "Prebend"), value: BendTypes.TYPE_PREBEND },
+                    { text: qsTrc("inspector", "Prebend/Release"), value: BendTypes.TYPE_PREBEND_RELEASE },
+                    { text: qsTrc("inspector", "Custom"), value: BendTypes.TYPE_CUSTOM }
                 ]
 
-                currentIndex: root.model && !root.model.bendType.isUndefined ? indexOfValue(root.model.bendType.value) : -1
+                currentIndex: root.model && !root.model.bendType.isUndefined ? btypes.indexOfValue(root.model.bendType.value) : -1
 
-                onValueChanged: {
-                    root.model.bendType.value = value
+                onCurrentValueChanged: {
+                    root.model.bendType.value = btypes.currentValue
                 }
             }
         }
 
         InspectorPropertyView {
-            titleText: qsTr("Click to add or remove points")
+            titleText: qsTrc("inspector", "Click to add or remove points")
             propertyItem: root.model ? root.model.bendCurve : null
 
             GridCanvas {
@@ -70,7 +89,7 @@ StyledPopup {
         }
 
         InspectorPropertyView {
-            titleText: qsTr("Line thickness")
+            titleText: qsTrc("inspector", "Line thickness")
             propertyItem: model ? model.lineThickness : null
 
             IncrementalPropertyControl {

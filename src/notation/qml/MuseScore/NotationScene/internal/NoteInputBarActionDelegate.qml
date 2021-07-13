@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Layouts 1.12
 
@@ -9,10 +30,6 @@ Item {
 
     height: parent ? parent.height : implicitHeight
     width: parent ? parent.width : implicitWidth
-
-    property bool isSelected: Boolean(selectedRole) ? selectedRole : false
-
-    signal clicked()
 
     RowLayout {
         anchors.fill: parent
@@ -48,65 +65,6 @@ Item {
 
             horizontalAlignment: Qt.AlignLeft
             text: Boolean(itemRole) ? itemRole.title : ""
-        }
-
-    }
-
-    Rectangle {
-        id: background
-
-        anchors.fill: parent
-
-        z: -1
-
-        color: "transparent"
-        opacity: 1
-
-        states: [
-            State {
-                name: "HOVERED"
-                when: mouseArea.containsMouse && !mouseArea.pressed && !root.isSelected
-
-                PropertyChanges {
-                    target: background
-                    opacity: ui.theme.buttonOpacityHover
-                    color: ui.theme.buttonColor
-                }
-            },
-
-            State {
-                name: "PRESSED"
-                when: mouseArea.pressed && !root.isSelected
-
-                PropertyChanges {
-                    target: background
-                    opacity: ui.theme.buttonOpacityHit
-                    color: ui.theme.buttonColor
-                }
-            },
-
-            State {
-                name: "SELECTED"
-                when: root.isSelected
-
-                PropertyChanges {
-                    target: background
-                    opacity: ui.theme.accentOpacityHit
-                    color: ui.theme.accentColor
-                }
-            }
-        ]
-
-        MouseArea {
-            id: mouseArea
-
-            anchors.fill: parent
-
-            hoverEnabled: true
-
-            onClicked: {
-                root.clicked()
-            }
         }
     }
 }

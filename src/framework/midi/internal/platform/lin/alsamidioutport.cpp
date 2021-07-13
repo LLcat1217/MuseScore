@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "alsamidioutport.h"
 
 #include <alsa/asoundlib.h>
@@ -34,11 +37,6 @@ struct mu::midi::AlsaMidiOutPort::Alsa {
 
 using namespace mu::midi;
 
-AlsaMidiOutPort::AlsaMidiOutPort()
-{
-    m_alsa = std::unique_ptr<Alsa>(new Alsa());
-}
-
 AlsaMidiOutPort::~AlsaMidiOutPort()
 {
     if (isConnected()) {
@@ -46,8 +44,34 @@ AlsaMidiOutPort::~AlsaMidiOutPort()
     }
 }
 
+void AlsaMidiOutPort::init()
+{
+    m_alsa = std::unique_ptr<Alsa>(new Alsa());
+
+    m_devicesListener.startWithCallback([this]() {
+        return devices();
+    });
+
+    m_devicesListener.devicesChanged().onNotify(this, [this]() {
+        bool connectedDeviceRemoved = true;
+        for (const MidiDevice& device: devices()) {
+            if (m_deviceID == device.id) {
+                connectedDeviceRemoved = false;
+            }
+        }
+
+        if (connectedDeviceRemoved) {
+            disconnect();
+        }
+
+        m_devicesChanged.notify();
+    });
+}
+
 std::vector<MidiDevice> AlsaMidiOutPort::devices() const
 {
+    std::lock_guard lock(m_devicesMutex);
+
     int streams = SND_SEQ_OPEN_OUTPUT;
     unsigned int cap = SND_SEQ_PORT_CAP_SUBS_READ | SND_SEQ_PORT_CAP_READ;
 
@@ -70,6 +94,10 @@ std::vector<MidiDevice> AlsaMidiOutPort::devices() const
 
     while (snd_seq_query_next_client(handle, cinfo) >= 0) {
         client = snd_seq_client_info_get_client(cinfo);
+        if (client == SND_SEQ_CLIENT_SYSTEM) {
+            continue;
+        }
+
         snd_seq_port_info_alloca(&pinfo);
         snd_seq_port_info_set_client(pinfo, client);
 
@@ -91,8 +119,17 @@ std::vector<MidiDevice> AlsaMidiOutPort::devices() const
     return ret;
 }
 
+mu::async::Notification AlsaMidiOutPort::devicesChanged() const
+{
+    return m_devicesChanged;
+}
+
 mu::Ret AlsaMidiOutPort::connect(const MidiDeviceID& deviceID)
 {
+    if (!deviceExists(deviceID)) {
+        return make_ret(Err::MidiFailedConnect, "not found device, id: " + deviceID);
+    }
+
     std::vector<std::string> cp;
     strings::split(deviceID, cp, ":");
     IF_ASSERT_FAILED(cp.size() == 2) {
@@ -200,4 +237,15 @@ mu::Ret AlsaMidiOutPort::sendEvent(const Event& e)
     snd_seq_event_output_direct(m_alsa->midiOut, &seqev);
 
     return Ret(true);
+}
+
+bool AlsaMidiOutPort::deviceExists(const MidiDeviceID& deviceId) const
+{
+    for (const MidiDevice& device : devices()) {
+        if (device.id == deviceId) {
+            return true;
+        }
+    }
+
+    return false;
 }

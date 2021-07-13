@@ -1,4 +1,27 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "intinputvalidator.h"
+
+using namespace mu::uicomponents;
 
 IntInputValidator::IntInputValidator(QObject* parent)
     : QValidator(parent)
@@ -25,14 +48,14 @@ QValidator::State IntInputValidator::validate(QString& inputStr, int& cursorPos)
 {
     QValidator::State state = Invalid;
 
-    if (inputStr.contains(QRegExp("^\\-?\\d{1,3}$"))) {
-        if (inputStr.contains(QRegExp("^\\-?0{2,3}"))
+    if (inputStr.contains(QRegularExpression("^\\-?\\d{1,3}$"))) {
+        if (inputStr.contains(QRegularExpression("^\\-?0{2,3}"))
             || (inputStr.startsWith("-") && inputStr.toDouble() == 0.0)) {
             state = Intermediate;
         } else {
             state = Acceptable;
         }
-    } else if (inputStr.contains(QRegExp("^\\-?$"))) {
+    } else if (inputStr.contains(QRegularExpression("^\\-?$"))) {
         state = Intermediate;
     } else {
         cursorPos = 0;

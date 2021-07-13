@@ -1,5 +1,26 @@
-#ifndef INSPECTORLISTMODEL_H
-#define INSPECTORLISTMODEL_H
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+#ifndef MU_INSPECTOR_INSPECTORLISTMODEL_H
+#define MU_INSPECTOR_INSPECTORLISTMODEL_H
 
 #include <QAbstractListModel>
 #include "libmscore/element.h"
@@ -9,8 +30,7 @@
 #include "context/iglobalcontext.h"
 #include "async/asyncable.h"
 
-using namespace mu::notation;
-
+namespace mu::inspector {
 class InspectorListModel : public QAbstractListModel, public mu::async::Asyncable
 {
     Q_OBJECT
@@ -18,14 +38,7 @@ class InspectorListModel : public QAbstractListModel, public mu::async::Asyncabl
     INJECT(inspector, mu::context::IGlobalContext, context)
 
 public:
-    enum RoleNames {
-        InspectorDataRole = Qt::UserRole + 1,
-        InspectorTitleRole
-    };
-
     explicit InspectorListModel(QObject* parent = nullptr);
-
-    void setElementList(const QList<Ms::Element*>& selectedElementList);
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
@@ -34,8 +47,16 @@ public:
 
 signals:
     void elementsModified();
+    void modelChanged();
 
 private:
+    enum RoleNames {
+        InspectorDataRole = Qt::UserRole + 1,
+        InspectorTitleRole
+    };
+
+    void setElementList(const QList<Ms::Element*>& selectedElementList);
+
     void buildModelsForEmptySelection(const QSet<Ms::ElementType>& selectedElementSet);
     void buildModelsForSelectedElements(const QSet<Ms::ElementType>& selectedElementSet);
 
@@ -52,7 +73,8 @@ private:
     QList<AbstractInspectorModel*> m_modelList;
 
     IElementRepositoryService* m_repository = nullptr;
-    INotationPtr m_notation;
+    notation::INotationPtr m_notation;
 };
+}
 
-#endif // INSPECTORLISTMODEL_H
+#endif // MU_INSPECTOR_INSPECTORLISTMODEL_H

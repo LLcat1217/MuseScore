@@ -1,16 +1,36 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
 import MuseScore.UiComponents 1.0
 import "../../common"
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property QtObject model: null
 
-    implicitHeight: contentColumn.implicitHeight + topPadding + bottomPadding
-    width: parent.width
+    contentHeight: contentColumn.implicitHeight
 
     Column {
         id: contentColumn
@@ -20,7 +40,7 @@ StyledPopup {
         spacing: 16
 
         InspectorPropertyView {
-            titleText: qsTr("Interpretation")
+            titleText: qsTrc("inspector", "Interpretation")
             propertyItem: root.model ? root.model.isLiteral : null
 
             RadioButtonGroup {
@@ -30,8 +50,8 @@ StyledPopup {
                 width: parent.width
 
                 model: [
-                    { textRole: qsTr("Literal"), valueRole: true },
-                    { textRole: qsTr("Jazz"), valueRole: false }
+                    { textRole: qsTrc("inspector", "Literal"), valueRole: true },
+                    { textRole: qsTrc("inspector", "Jazz"), valueRole: false }
                 ]
 
                 delegate: FlatRadioButton {
@@ -53,53 +73,51 @@ StyledPopup {
         }
 
         InspectorPropertyView {
-            titleText: qsTr("Voicing")
+            titleText: qsTrc("inspector", "Voicing")
             propertyItem: root.model ? root.model.voicingType : null
 
-            StyledComboBox {
+            Dropdown {
+                id: voicing
+
                 width: parent.width
 
-                textRoleName: "text"
-                valueRoleName: "value"
-
                 model: [
-                    { text: qsTr("Auto"), value: ChordSymbolTypes.VOICING_AUTO },
-                    { text: qsTr("Root only"), value: ChordSymbolTypes.VOICING_ROOT_ONLY },
-                    { text: qsTr("Close"), value: ChordSymbolTypes.VOICING_CLOSE },
-                    { text: qsTr("Drop two"), value: ChordSymbolTypes.VOICING_DROP_TWO },
-                    { text: qsTr("Six note"), value: ChordSymbolTypes.VOICING_SIX_NOTE },
-                    { text: qsTr("Four note"), value: ChordSymbolTypes.VOICING_FOUR_NOTE },
-                    { text: qsTr("Three note"), value: ChordSymbolTypes.VOICING_THREE_NOTE }
+                    { text: qsTrc("inspector", "Auto"), value: ChordSymbolTypes.VOICING_AUTO },
+                    { text: qsTrc("inspector", "Root only"), value: ChordSymbolTypes.VOICING_ROOT_ONLY },
+                    { text: qsTrc("inspector", "Close"), value: ChordSymbolTypes.VOICING_CLOSE },
+                    { text: qsTrc("inspector", "Drop two"), value: ChordSymbolTypes.VOICING_DROP_TWO },
+                    { text: qsTrc("inspector", "Six note"), value: ChordSymbolTypes.VOICING_SIX_NOTE },
+                    { text: qsTrc("inspector", "Four note"), value: ChordSymbolTypes.VOICING_FOUR_NOTE },
+                    { text: qsTrc("inspector", "Three note"), value: ChordSymbolTypes.VOICING_THREE_NOTE }
                 ]
 
-                currentIndex: root.model && !root.model.voicingType.isUndefined ? indexOfValue(root.model.voicingType.value) : -1
+                currentIndex: root.model && !root.model.voicingType.isUndefined ? voicing.indexOfValue(root.model.voicingType.value) : -1
 
-                onValueChanged: {
-                    root.model.voicingType.value = value
+                onCurrentValueChanged: {
+                    root.model.voicingType.value = voicing.currentValue
                 }
             }
         }
 
         InspectorPropertyView {
-            titleText: qsTr("Duration")
+            titleText: qsTrc("inspector", "Duration")
             propertyItem: root.model ? root.model.durationType : null
 
-            StyledComboBox {
+            Dropdown {
+                id: durations
+
                 width: parent.width
 
-                textRoleName: "text"
-                valueRoleName: "value"
-
                 model: [
-                    { text: qsTr("Until the next chord symbol"), value: ChordSymbolTypes.DURATION_UNTIL_NEXT_CHORD_SYMBOL },
-                    { text: qsTr("Until the end of the bar"), value: ChordSymbolTypes.DURATION_STOP_AT_MEASURE_END },
-                    { text: qsTr("Until the end of the attached duration"), value: ChordSymbolTypes.DURATION_SEGMENT_DURATION }
+                    { text: qsTrc("inspector", "Until the next chord symbol"), value: ChordSymbolTypes.DURATION_UNTIL_NEXT_CHORD_SYMBOL },
+                    { text: qsTrc("inspector", "Until the end of the bar"), value: ChordSymbolTypes.DURATION_STOP_AT_MEASURE_END },
+                    { text: qsTrc("inspector", "Until the end of the attached duration"), value: ChordSymbolTypes.DURATION_SEGMENT_DURATION }
                 ]
 
-                currentIndex: root.model && !root.model.durationType.isUndefined ? indexOfValue(root.model.durationType.value) : -1
+                currentIndex: root.model && !root.model.durationType.isUndefined ? durations.indexOfValue(root.model.durationType.value) : -1
 
-                onValueChanged: {
-                    root.model.durationType.value = value
+                onCurrentValueChanged: {
+                    root.model.durationType.value = durations.currentValue
                 }
             }
         }

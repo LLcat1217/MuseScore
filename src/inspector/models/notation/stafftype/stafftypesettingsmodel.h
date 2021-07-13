@@ -1,8 +1,30 @@
-#ifndef STAFFTYPESETTINGSMODEL_H
-#define STAFFTYPESETTINGSMODEL_H
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+#ifndef MU_INSPECTOR_STAFFTYPESETTINGSMODEL_H
+#define MU_INSPECTOR_STAFFTYPESETTINGSMODEL_H
 
 #include "models/abstractinspectormodel.h"
 
+namespace mu::inspector {
 class StaffTypeSettingsModel : public AbstractInspectorModel
 {
     Q_OBJECT
@@ -14,6 +36,8 @@ class StaffTypeSettingsModel : public AbstractInspectorModel
     Q_PROPERTY(PropertyItem * lineCount READ lineCount CONSTANT)
     Q_PROPERTY(PropertyItem * lineDistance READ lineDistance CONSTANT)
     Q_PROPERTY(PropertyItem * stepOffset READ stepOffset CONSTANT)
+    Q_PROPERTY(PropertyItem * isInvisible READ isInvisible CONSTANT)
+    Q_PROPERTY(PropertyItem * color READ color CONSTANT)
 
     Q_PROPERTY(PropertyItem * noteheadSchemeType READ noteheadSchemeType CONSTANT)
     Q_PROPERTY(PropertyItem * isStemless READ isStemless CONSTANT)
@@ -37,6 +61,8 @@ public:
     PropertyItem* lineCount() const;
     PropertyItem* lineDistance() const;
     PropertyItem* stepOffset() const;
+    PropertyItem* isInvisible() const;
+    PropertyItem* color() const;
 
     PropertyItem* noteheadSchemeType() const;
     PropertyItem* isStemless() const;
@@ -54,6 +80,8 @@ private:
     PropertyItem* m_lineCount = nullptr;
     PropertyItem* m_lineDistance = nullptr;
     PropertyItem* m_stepOffset = nullptr;
+    PropertyItem* m_isInvisible = nullptr;
+    PropertyItem* m_color = nullptr;
 
     PropertyItem* m_noteheadSchemeType = nullptr;
     PropertyItem* m_isStemless = nullptr;
@@ -63,5 +91,6 @@ private:
     PropertyItem* m_shouldGenerateTimeSignatures = nullptr;
     PropertyItem* m_shouldGenerateKeySignatures = nullptr;
 };
+}
 
-#endif // STAFFTYPESETTINGSMODEL_H
+#endif // MU_INSPECTOR_STAFFTYPESETTINGSMODEL_H

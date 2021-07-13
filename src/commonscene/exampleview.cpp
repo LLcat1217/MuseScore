@@ -1,14 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2013 Werner Schweer and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENSE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "exampleview.h"
 
@@ -23,7 +33,11 @@
 #include "libmscore/chord.h"
 #include "libmscore/xml.h"
 
+#include "engraving/draw/qpainterprovider.h"
+
 #include "commonscenetypes.h"
+
+using namespace mu;
 
 namespace Ms {
 //---------------------------------------------------------
@@ -43,9 +57,11 @@ ExampleView::ExampleView(QWidget* parent)
     if (notationConfiguration()->foregroundUseColor()) {
         _fgColor = notationConfiguration()->foregroundColor();
     } else {
-        _fgPixmap = new QPixmap(notationConfiguration()->foregroundWallpaper().toQString());
+        QString wallpaperPath = notationConfiguration()->foregroundWallpaperPath().toQString();
+
+        _fgPixmap = new QPixmap(wallpaperPath);
         if (_fgPixmap == 0 || _fgPixmap->isNull()) {
-            qDebug("no valid pixmap %s", qPrintable(notationConfiguration()->foregroundWallpaper().toQString()));
+            qDebug("no valid pixmap %s", qPrintable(wallpaperPath));
         }
     }
     // setup drag canvas state
@@ -102,7 +118,7 @@ void ExampleView::layoutChanged()
 {
 }
 
-void ExampleView::dataChanged(const QRectF&)
+void ExampleView::dataChanged(const RectF&)
 {
 }
 
@@ -148,7 +164,7 @@ void ExampleView::setCursor(const QCursor&)
 {
 }
 
-void ExampleView::setDropRectangle(const QRectF&)
+void ExampleView::setDropRectangle(const RectF&)
 {
 }
 
@@ -156,18 +172,17 @@ void ExampleView::cmdAddSlur(Note* /*firstNote*/, Note* /*lastNote*/)
 {
 }
 
-Element* ExampleView::elementNear(QPointF)
+Element* ExampleView::elementNear(PointF)
 {
     return 0;
 }
 
-void ExampleView::drawBackground(QPainter* p, const QRectF& r) const
+void ExampleView::drawBackground(mu::draw::Painter* p, const RectF& r) const
 {
     if (_fgPixmap == 0 || _fgPixmap->isNull()) {
         p->fillRect(r, _fgColor);
     } else {
-        p->drawTiledPixmap(r, *_fgPixmap, r.topLeft()
-                           - QPoint(lrint(_matrix.dx()), lrint(_matrix.dy())));
+        p->drawTiledPixmap(r, *_fgPixmap, r.topLeft() - PointF(lrint(_matrix.dx()), lrint(_matrix.dy())));
     }
 }
 
@@ -175,11 +190,11 @@ void ExampleView::drawBackground(QPainter* p, const QRectF& r) const
 //   drawElements
 //---------------------------------------------------------
 
-void ExampleView::drawElements(QPainter& painter, const QList<Element*>& el)
+void ExampleView::drawElements(mu::draw::Painter& painter, const QList<Element*>& el)
 {
     for (Element* e : el) {
         e->itemDiscovered = 0;
-        QPointF pos(e->pagePos());
+        PointF pos(e->pagePos());
         painter.translate(pos);
         e->draw(&painter);
         painter.translate(-pos);
@@ -193,19 +208,18 @@ void ExampleView::drawElements(QPainter& painter, const QList<Element*>& el)
 void ExampleView::paintEvent(QPaintEvent* ev)
 {
     if (_score) {
-        QPainter p(this);
-        p.setRenderHint(QPainter::Antialiasing, true);
-        p.setRenderHint(QPainter::TextAntialiasing, true);
-        const QRect r(ev->rect());
+        mu::draw::Painter p(this, "exampleview");
+        p.setAntialiasing(true);
+        const RectF r = RectF::fromQRectF(ev->rect());
 
         drawBackground(&p, r);
 
-        p.setTransform(_matrix);
-        QRectF fr = imatrix.mapRect(QRectF(r));
+        p.setWorldTransform(_matrix);
+        QRectF fr = imatrix.mapRect(r.toQRectF());
 
-        QRegion r1(r);
+        QRegion r1(r.toQRect());
         Page* page = _score->pages().front();
-        QList<Element*> ell = page->items(fr);
+        QList<Element*> ell = page->items(RectF::fromQRectF(fr));
         std::stable_sort(ell.begin(), ell.end(), elementLessThan);
         drawElements(p, ell);
     }
@@ -219,15 +233,15 @@ void ExampleView::paintEvent(QPaintEvent* ev)
 void ExampleView::dragEnterEvent(QDragEnterEvent* event)
 {
     const QMimeData* d = event->mimeData();
-    if (d->hasFormat(mu::MIME_SYMBOL_FORMAT)) {
+    if (d->hasFormat(mu::commonscene::MIME_SYMBOL_FORMAT)) {
         event->acceptProposedAction();
 
-        QByteArray a = d->data(mu::MIME_SYMBOL_FORMAT);
+        QByteArray a = d->data(mu::commonscene::MIME_SYMBOL_FORMAT);
 
 // qDebug("ExampleView::dragEnterEvent Symbol: <%s>", a.data());
 
         XmlReader e(a);
-        QPointF dragOffset;
+        PointF dragOffset;
         Fraction duration;      // dummy
         ElementType type = Element::readType(e, &dragOffset, &duration);
 
@@ -262,7 +276,7 @@ static void moveElement(void* data, Element* e)
 {
     QPointF* pos = (QPointF*)data;
     e->score()->addRefresh(e->canvasBoundingRect());
-    e->setPos(*pos);
+    e->setPos(mu::PointF::fromQPointF(*pos));
     e->score()->addRefresh(e->canvasBoundingRect());
 }
 
@@ -278,7 +292,7 @@ void ExampleView::dragMoveEvent(QDragMoveEvent* event)
         return;
     }
 
-    QPointF pos(imatrix.map(QPointF(event->pos())));
+    PointF pos = PointF::fromQPointF(imatrix.map(QPointF(event->pos())));
     QList<Element*> el = elementsAt(pos);
     bool found = false;
     foreach (const Element* e, el) {
@@ -330,7 +344,7 @@ void ExampleView::setDropTarget(const Element* el)
 
 void ExampleView::dropEvent(QDropEvent* event)
 {
-    QPointF pos(imatrix.map(QPointF(event->pos())));
+    PointF pos = PointF::fromQPointF(imatrix.map(QPointF(event->pos())));
 
     if (!dragElement) {
         return;
@@ -378,7 +392,7 @@ void ExampleView::dropEvent(QDropEvent* event)
 void ExampleView::mousePressEvent(QMouseEvent* event)
 {
     startMove  = imatrix.map(QPointF(event->pos()));
-    QPointF pos(imatrix.map(QPointF(event->pos())));
+    PointF pos = PointF::fromQPointF(imatrix.map(QPointF(event->pos())));
 
     foreach (Element* e, elementsAt(pos)) {
         if (e->type() == ElementType::NOTE) {

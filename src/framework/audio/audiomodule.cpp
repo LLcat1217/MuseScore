@@ -1,62 +1,93 @@
-﻿//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "audiomodule.h"
 
 #include <QQmlEngine>
 
-#include "invoker.h"
-
-#include "modularity/ioc.h"
-#include "internal/audioengine.h"
-#include "internal/audioplayer.h"
-
-#include "internal/worker/queuedrpcstreamchannel.h"
-#include "internal/worker/audiothreadstreamworker.h"
-#include "internal/rpcmidisource.h"
-
 #include "ui/iuiengine.h"
-#include "devtools/audioenginedevtools.h"
+#include "modularity/ioc.h"
+#include "log.h"
+
+#include "internal/audioconfiguration.h"
+#include "internal/audiosanitizer.h"
+#include "internal/audiothread.h"
+#include "internal/audiobuffer.h"
+
+#include "internal/worker/audioengine.h"
+#include "internal/worker/playback.h"
+
+// synthesizers
+#include "internal/synthesizers/fluidsynth/fluidsynth.h"
+#include "internal/synthesizers/soundfontsprovider.h"
+#include "internal/synthesizers/synthesizercontroller.h"
+#include "internal/synthesizers/synthesizersregister.h"
+
+#include "view/synthssettingsmodel.h"
+#include "devtools/waveformmodel.h"
+
+#include "diagnostics/idiagnosticspathsregister.h"
+
+#include "log.h"
+
+using namespace mu::modularity;
+using namespace mu::audio;
+
+static std::shared_ptr<AudioConfiguration> s_audioConfiguration = std::make_shared<AudioConfiguration>();
+static std::shared_ptr<AudioThread> s_audioWorker = std::make_shared<AudioThread>();
+static std::shared_ptr<mu::audio::AudioBuffer> s_audioBuffer = std::make_shared<mu::audio::AudioBuffer>();
+
+static std::shared_ptr<Playback> s_playbackFacade = std::make_shared<Playback>();
 
 #ifdef Q_OS_LINUX
 #include "internal/platform/lin/linuxaudiodriver.h"
+static std::shared_ptr<IAudioDriver> s_audioDriver = std::shared_ptr<IAudioDriver>(new LinuxAudioDriver());
 #endif
 
 #ifdef Q_OS_WIN
-#include "internal/platform/win/winmmdriver.h"
+//#include "internal/platform/win/winmmdriver.h"
+//static std::shared_ptr<IAudioDriver> s_audioDriver = std::shared_ptr<IAudioDriver>(new WinmmDriver());
+#include "internal/platform/win/wincoreaudiodriver.h"
+static std::shared_ptr<IAudioDriver> s_audioDriver = std::shared_ptr<IAudioDriver>(new CoreAudioDriver());
 #endif
 
 #ifdef Q_OS_MACOS
 #include "internal/platform/osx/osxaudiodriver.h"
+static std::shared_ptr<IAudioDriver> s_audioDriver = std::shared_ptr<IAudioDriver>(new OSXAudioDriver());
 #endif
 
 #ifdef Q_OS_WASM
 #include "internal/platform/web/webaudiodriver.h"
+static std::shared_ptr<IAudioDriver> s_audioDriver = std::shared_ptr<IAudioDriver>(new WebAudioDriver());
 #endif
 
-using namespace mu::audio;
-using namespace mu::audio::worker;
+static void audio_init_qrc()
+{
+    Q_INIT_RESOURCE(audio);
+}
 
-static bool s_isAudioModuleInited = false;
-static std::shared_ptr<AudioEngine> s_audioEngine = std::make_shared<AudioEngine>();
-static std::shared_ptr<QueuedRpcStreamChannel> s_rpcChannel = std::make_shared<QueuedRpcStreamChannel>();
-static std::shared_ptr<AudioThreadStreamWorker> s_worker = std::make_shared<AudioThreadStreamWorker>(s_rpcChannel);
-static std::shared_ptr<mu::framework::Invoker> s_rpcChannelInvoker;
+AudioModule::AudioModule()
+{
+    AudioSanitizer::setupMainThread();
+}
 
 std::string AudioModule::moduleName() const
 {
@@ -65,67 +96,133 @@ std::string AudioModule::moduleName() const
 
 void AudioModule::registerExports()
 {
-    framework::ioc()->registerExport<IAudioEngine>(moduleName(), s_audioEngine);
-    framework::ioc()->registerExport<IAudioPlayer>(moduleName(), new AudioPlayer());
-    framework::ioc()->registerExport<IRpcAudioStreamChannel>(moduleName(), s_rpcChannel);
-    framework::ioc()->registerExport<IMidiSource>(moduleName(), std::make_shared<RpcMidiSource>());
+    ioc()->registerExport<IAudioConfiguration>(moduleName(), s_audioConfiguration);
+    ioc()->registerExport<IAudioDriver>(moduleName(), s_audioDriver);
+    ioc()->registerExport<IPlayback>(moduleName(), s_playbackFacade);
 
-#ifdef Q_OS_LINUX
-    framework::ioc()->registerExport<IAudioDriver>(moduleName(), new LinuxAudioDriver());
-#endif
+    // synthesizers
+    std::shared_ptr<synth::ISynthesizersRegister> sreg = std::make_shared<synth::SynthesizersRegister>();
+    sreg->registerSynthesizer("Fluid", std::make_shared<synth::FluidSynth>());
+    sreg->setDefaultSynthesizer("Fluid");
 
-#ifdef Q_OS_WIN
-    framework::ioc()->registerExport<IAudioDriver>(moduleName(), new WinmmDriver());
-#endif
+    ioc()->registerExport<synth::ISynthesizersRegister>(moduleName(), sreg);
+    ioc()->registerExport<synth::ISoundFontsProvider>(moduleName(), new synth::SoundFontsProvider());
+}
 
-#ifdef Q_OS_MACOS
-    framework::ioc()->registerExport<IAudioDriver>(moduleName(), new OSXAudioDriver());
-#endif
-
-#ifdef Q_OS_WASM
-    framework::ioc()->registerExport<IAudioDriver>(moduleName(), new WebAudioDriver());
-#endif
+void AudioModule::registerResources()
+{
+    audio_init_qrc();
 }
 
 void AudioModule::registerUiTypes()
 {
-    qmlRegisterType<AudioEngineDevTools>("MuseScore.Audio", 1, 0, "AudioEngineDevTools");
+    qmlRegisterType<WaveFormModel>("MuseScore.Audio", 1, 0, "WaveFormModel");
+    qmlRegisterType<synth::SynthsSettingsModel>("MuseScore.Audio", 1, 0, "SynthsSettingsModel");
 
-    //! NOTE No Qml, as it will be, need to uncomment
-    //framework::ioc()->resolve<framework::IUiEngine>(moduleName())->addSourceImportPath(mu4_audio_QML_IMPORT);
+    ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(audio_QML_IMPORT);
 }
 
 void AudioModule::onInit(const framework::IApplication::RunMode& mode)
 {
-    if (framework::IApplication::RunMode::Editor != mode) {
+    if (mode != framework::IApplication::RunMode::Editor) {
         return;
     }
 
-    s_audioEngine->init();
+    /** We have three layers
+        ------------------------
+        Main (main thread) - public client interface
+            see registerExports
+        ------------------------
+        Worker (worker thread) - generate and mix audio data
+            * AudioEngine
+            * Sequencer
+            * Players
+            * Synthesizers
+            * Audio decode (.ogg ...)
+            * Mixer
+        ------------------------
+        Driver (driver thread) - request audio data to play
+        ------------------------
 
-    s_rpcChannelInvoker = std::make_shared<mu::framework::Invoker>();
+        All layers work in separate threads.
+        We need to make sure that each part of the system works only in its thread and,
+        ideally, there is no access to the same object from different threads,
+        in order to avoid problems associated with access data thread safety.
 
-    s_rpcChannel->onWorkerQueueChanged([]() {
-        //! NOTE Called from worker thread
-        s_rpcChannelInvoker->invoke([]() {
-            //! NOTE Called from main thread
-            s_rpcChannel->process();
-        });
-    });
+        Objects from different layers (threads) must interact only through:
+            * Asyncronous API (@see thirdparty/deto) - controls and pass midi data
+            * AudioBuffer - pass audio data from worker to driver for play
 
-#ifndef Q_OS_WASM
-    s_worker->run();
-#endif
+        AudioEngine is in the worker and operates only with the buffer,
+        in fact, it knows nothing about the data consumer, about the audio driver.
 
-    s_isAudioModuleInited = true;
+    **/
+
+    // Init configuration
+    s_audioConfiguration->init();
+
+    s_audioBuffer->init(s_audioConfiguration->audioChannelsCount());
+
+    // Setup audio driver
+    IAudioDriver::Spec requiredSpec;
+    requiredSpec.sampleRate = 48000;
+    requiredSpec.format = IAudioDriver::Format::AudioF32;
+    requiredSpec.channels = s_audioConfiguration->audioChannelsCount();
+    requiredSpec.samples = s_audioConfiguration->driverBufferSize();
+    requiredSpec.callback = [](void* /*userdata*/, uint8_t* stream, int byteCount) {
+        auto samplesPerChannel = byteCount / (2 * sizeof(float));
+        s_audioBuffer->pop(reinterpret_cast<float*>(stream), samplesPerChannel);
+    };
+
+    IAudioDriver::Spec activeSpec;
+    bool driverOpened = s_audioDriver->open(requiredSpec, &activeSpec);
+    if (!driverOpened) {
+        LOGE() << "audio output open failed";
+        return;
+    }
+
+    // Setup worker
+    auto workerSetup = [activeSpec]() {
+        AudioSanitizer::setupWorkerThread();
+        ONLY_AUDIO_WORKER_THREAD;
+
+        // Setup audio engine
+        AudioEngine::instance()->init(s_audioBuffer);
+        AudioEngine::instance()->setAudioChannelsCount(s_audioConfiguration->audioChannelsCount());
+        AudioEngine::instance()->setSampleRate(activeSpec.sampleRate);
+        AudioEngine::instance()->setReadBufferSize(activeSpec.samples);
+
+        // Initialize IPlayback facade and make sure that it's initialized after the audio-engine
+        s_playbackFacade->init();
+    };
+
+    auto workerLoopBody = []() {
+        ONLY_AUDIO_WORKER_THREAD;
+        s_audioBuffer->forward();
+    };
+
+    s_audioWorker->run(workerSetup, workerLoopBody);
+
+    //! --- Diagnostics ---
+    auto pr = ioc()->resolve<diagnostics::IDiagnosticsPathsRegister>(moduleName());
+    if (pr) {
+        std::vector<io::path> paths = s_audioConfiguration->soundFontPaths();
+        for (const io::path& p : paths) {
+            pr->reg("soundfonts", p);
+        }
+    }
 }
 
 void AudioModule::onDeinit()
 {
-    if (!s_isAudioModuleInited) {
-        return;
+    if (s_audioDriver->isOpened()) {
+        s_audioDriver->close();
     }
 
-    s_worker->stop();
-    s_audioEngine->deinit();
+    if (s_audioWorker->isRunning()) {
+        s_audioWorker->stop([]() {
+            ONLY_AUDIO_WORKER_THREAD;
+            AudioEngine::instance()->deinit();
+        });
+    }
 }

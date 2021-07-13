@@ -1,27 +1,24 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2020 MuseScore BVBA and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(MODULE midi)
-
-include(${CMAKE_CURRENT_LIST_DIR}/internal/zerberus/zerberus.cmake)
-
-add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/fluidsynth fluidsynth)
 
 include(GetPlatformInfo)
 if (OS_IS_WIN)
@@ -32,6 +29,10 @@ if (OS_IS_WIN)
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmidiinport.h
     )
 elseif(OS_IS_LIN)
+    find_package(ALSA REQUIRED)
+    set(MODULE_LINK ${ALSA_LIBRARIES} pthread )
+    set(MODULE_INCLUDE ${MODULE_INCLUDE} ${ALSA_INCLUDE_DIRS} )
+
     set(DRIVER_SRC
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidioutport.cpp
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/lin/alsamidioutport.h
@@ -49,69 +50,29 @@ endif()
 
 
 set(MODULE_SRC
-    ${ZERBERUS_SRC}
     ${DRIVER_SRC}
     ${CMAKE_CURRENT_LIST_DIR}/midimodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/midimodule.h
-    ${CMAKE_CURRENT_LIST_DIR}/isynthesizer.h
-    ${CMAKE_CURRENT_LIST_DIR}/isynthesizersregister.h
-    ${CMAKE_CURRENT_LIST_DIR}/isequencer.h
-    ${CMAKE_CURRENT_LIST_DIR}/isoundfontsprovider.h
     ${CMAKE_CURRENT_LIST_DIR}/imidiconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/imidiinport.h
     ${CMAKE_CURRENT_LIST_DIR}/imidioutport.h
-    ${CMAKE_CURRENT_LIST_DIR}/imidiportdatasender.h
     ${CMAKE_CURRENT_LIST_DIR}/midievent.h
     ${CMAKE_CURRENT_LIST_DIR}/miditypes.h
     ${CMAKE_CURRENT_LIST_DIR}/midierrors.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/fluidsynth.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/fluidsynth.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/synthssettingsmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/synthssettingsmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/sequencer.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/sequencer.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizercontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizercontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/zerberussynth.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/zerberussynth.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizersregister.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizersregister.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/soundfontsprovider.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/soundfontsprovider.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/midiconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/midiconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/dummymidioutport.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/dummymidioutport.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/dummymidiinport.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/dummymidiinport.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/midiportdatasender.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/midiportdatasender.h
-    ${CMAKE_CURRENT_LIST_DIR}/devtools/midiportdevmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/devtools/midiportdevmodel.h
-    )
-
-
-set(FLUIDSYNTH_DIR ${PROJECT_SOURCE_DIR}/thirdparty/fluidsynth/fluidsynth-2.1.4)
-set (FLUIDSYNTH_INC
-    ${FLUIDSYNTH_DIR}/include
-    ${FLUIDSYNTH_DIR}/src
-    ${FLUIDSYNTH_DIR}/src/external
-    ${FLUIDSYNTH_DIR}/src/utils
-    ${FLUIDSYNTH_DIR}/src/midi
-    ${FLUIDSYNTH_DIR}/src/rvoice
-    ${FLUIDSYNTH_DIR}/src/sfloader
-    ${FLUIDSYNTH_DIR}/src/bindings
-    ${FLUIDSYNTH_DIR}/src/synth
-    ${FLUIDSYNTH_DIR}/src/drivers
-    )
-
-set (MODULE_INCLUDE
-    ${FLUIDSYNTH_INC}
+    ${CMAKE_CURRENT_LIST_DIR}/internal/midideviceslistener.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/midideviceslistener.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/devtools/midiportdevmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/devtools/midiportdevmodel.h
     )
 
 set(MODULE_LINK
-    fluidsynth
-    audiofile
+    ${MODULE_LINK}
     qzip
     )
 
@@ -119,5 +80,9 @@ include(GetPlatformInfo)
 if (OS_IS_WIN)
     set(MODULE_LINK ${MODULE_LINK} winmm)
 endif(OS_IS_WIN)
+
+set(MODULE_QRC midi.qrc)
+
+set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml )
 
 include(${PROJECT_SOURCE_DIR}/build/module.cmake)

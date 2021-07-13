@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef MU_FRAMEWORK_RET_H
 #define MU_FRAMEWORK_RET_H
@@ -61,14 +64,26 @@ public:
         MidiFirst       = 600,
         MidiLast        = 699,
 
-        LanguagesFirst = 700,
-        LanguagesLast  = 799,
+        LanguagesFirst  = 700,
+        LanguagesLast   = 799,
 
         NotationFirst   = 1000,
         NotationLast    = 1299,
 
         ConverterFirst  = 1300,
-        ConverterLast   = 1399
+        ConverterLast   = 1399,
+
+        VstFirst        = 1400,
+        VstLast         = 1499,
+
+        WorkspaceFirst  = 1500,
+        WorkspaceLast   = 1599,
+
+        LearnFirst      = 1600,
+        LearnLast       = 1699,
+
+        EngravingFirst  = 2000,
+        EngravingLast   = 2999,
     };
 
     Ret() = default;

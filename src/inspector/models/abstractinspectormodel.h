@@ -1,5 +1,26 @@
-#ifndef ABSTRACTINSPECTORMODEL_H
-#define ABSTRACTINSPECTORMODEL_H
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+#ifndef MU_INSPECTOR_ABSTRACTINSPECTORMODEL_H
+#define MU_INSPECTOR_ABSTRACTINSPECTORMODEL_H
 
 #include <QList>
 #include <functional>
@@ -9,24 +30,24 @@
 #include "libmscore/property.h"
 
 #include "internal/interfaces/ielementrepositoryservice.h"
-#include "iinspectoradapter.h"
 #include "notation/inotation.h"
+#include "context/iglobalcontext.h"
+#include "actions/iactionsdispatcher.h"
 #include "modularity/ioc.h"
 #include "models/propertyitem.h"
 
+namespace mu::inspector {
 class AbstractInspectorModel : public QObject
 {
     Q_OBJECT
 
-    INJECT(inspector, mu::inspector::IInspectorAdapter, adapter)
+    INJECT(inspector, context::IGlobalContext, context)
+    INJECT(inspector, actions::IActionsDispatcher, dispatcher)
 
     Q_PROPERTY(QString title READ title CONSTANT)
     Q_PROPERTY(InspectorSectionType sectionType READ sectionType CONSTANT)
     Q_PROPERTY(InspectorModelType modelType READ modelType CONSTANT)
     Q_PROPERTY(bool isEmpty READ isEmpty NOTIFY isEmptyChanged)
-
-    Q_ENUMS(InspectorSectionType)
-    Q_ENUMS(InspectorModelType)
 
 public:
     enum class InspectorSectionType {
@@ -37,6 +58,7 @@ public:
         SECTION_SCORE_DISPLAY,
         SECTION_SCORE_APPEARANCE
     };
+    Q_ENUM(InspectorSectionType)
 
     enum class InspectorModelType {
         TYPE_UNDEFINED = -1,
@@ -79,6 +101,7 @@ public:
         TYPE_TREMOLO,
         TYPE_MEASURE_REPEAT
     };
+    Q_ENUM(InspectorModelType)
 
     explicit AbstractInspectorModel(QObject* parent, IElementRepositoryService* repository = nullptr);
 
@@ -114,18 +137,26 @@ signals:
     void requestReloadPropertyItems();
 
 protected:
-    PropertyItem* buildPropertyItem(const Ms::Pid& pid,std::function<void(const int propertyId,
-                                                                          const QVariant& newValue)> onPropertyChangedCallBack = nullptr);
+    PropertyItem* buildPropertyItem(const Ms::Pid& pid, std::function<void(const int propertyId,
+                                                                           const QVariant& newValue)> onPropertyChangedCallBack = nullptr);
 
-    void loadPropertyItem(PropertyItem* propertyItem,std::function<QVariant(const QVariant&)> convertElementPropertyValueFunc = nullptr);
+    void loadPropertyItem(PropertyItem* propertyItem, std::function<QVariant(const QVariant&)> convertElementPropertyValueFunc = nullptr);
 
     bool isNotationExisting() const;
 
     QVariant valueToElementUnits(const Ms::Pid& pid, const QVariant& value, const Ms::Element* element) const;
     QVariant valueFromElementUnits(const Ms::Pid& pid, const QVariant& value, const Ms::Element* element) const;
 
+    notation::INotationStylePtr style() const;
     void updateStyleValue(const Ms::Sid& sid, const QVariant& newValue);
     QVariant styleValue(const Ms::Sid& sid) const;
+
+    notation::INotationUndoStackPtr undoStack() const;
+    void beginCommand();
+    void endCommand();
+
+    void updateNotation();
+    async::Notification currentNotationChanged() const;
 
     IElementRepositoryService* m_repository;
 
@@ -144,5 +175,6 @@ private:
     InspectorModelType m_modelType = InspectorModelType::TYPE_UNDEFINED;
     bool m_isEmpty = false;
 };
+}
 
-#endif // ABSTRACTINSPECTORMODEL_H
+#endif // MU_INSPECTOR_ABSTRACTINSPECTORMODEL_H

@@ -1,14 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2019 Werner Schweer
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENCE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef __PLUGIN_API_ELEMENTS_H__
 #define __PLUGIN_API_ELEMENTS_H__
@@ -265,6 +275,9 @@ class Element : public Ms::PluginAPI::ScoreElement
     API_PROPERTY(glissType,               GLISS_TYPE)
     API_PROPERTY(glissText,               GLISS_TEXT)
     API_PROPERTY(glissShowText,           GLISS_SHOW_TEXT)
+    API_PROPERTY(glissandoStyle,          GLISS_STYLE)
+    API_PROPERTY(glissEaseIn,             GLISS_EASEIN)
+    API_PROPERTY(glissEaseOut,            GLISS_EASEOUT)
     API_PROPERTY(diagonal,                DIAGONAL)
     API_PROPERTY(groups,                  GROUPS)
     API_PROPERTY(lineStyle,               LINE_STYLE)
@@ -303,7 +316,6 @@ class Element : public Ms::PluginAPI::ScoreElement
     API_PROPERTY(durationType,            DURATION_TYPE)
     API_PROPERTY(role,                    ROLE)
     API_PROPERTY_T(int, track,            TRACK)
-    API_PROPERTY(glissandoStyle,          GLISSANDO_STYLE)
     API_PROPERTY(fretStrings,             FRET_STRINGS)
     API_PROPERTY(fretFrets,               FRET_FRETS)
     /*API_PROPERTY( fretBarre,               FRET_BARRE                )*/
@@ -392,7 +404,7 @@ class Element : public Ms::PluginAPI::ScoreElement
     qreal posX() const { return element()->pos().x() / element()->spatium(); }
     qreal posY() const { return element()->pos().y() / element()->spatium(); }
 
-    QPointF pagePos() const { return element()->pagePos() / element()->spatium(); }
+    QPointF pagePos() const { return mu::PointF(element()->pagePos() / element()->spatium()).toQPointF(); }
 
     Ms::PluginAPI::Element* parent() const { return wrap(element()->parent()); }
     Staff* staff() { return wrap<Staff>(element()->staff()); }

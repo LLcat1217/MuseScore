@@ -1,21 +1,22 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2020 MuseScore BVBA and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(MODULE cloud)
 
@@ -26,16 +27,16 @@ set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml)
 set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/cloudmodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/cloudmodule.h
-    ${CMAKE_CURRENT_LIST_DIR}/iaccountcontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/imp3exporter.h
+    ${CMAKE_CURRENT_LIST_DIR}/iauthorizationservice.h
+    ${CMAKE_CURRENT_LIST_DIR}/iuploadingservice.h
+    ${CMAKE_CURRENT_LIST_DIR}/icloudconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/cloudtypes.h
     ${CMAKE_CURRENT_LIST_DIR}/view/accountmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/accountmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/accountcontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/accountcontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudmanager.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudmanager.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudmanager_p.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudservice.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudservice.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudconfiguration.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/cloudconfiguration.cpp
     )
 
 include(${PROJECT_SOURCE_DIR}/build/module.cmake)

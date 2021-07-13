@@ -1,26 +1,31 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Note Names Plugin
-//
-//  Copyright (C) 2012 Werner Schweer
-//  Copyright (C) 2013 - 2019 Joachim Schmitz
-//  Copyright (C) 2014 Jörn Eichler
-//  Copyright (C) 2020 MuseScore BVBA
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENCE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 import QtQuick 2.2
 import QtQuick.Controls 2.0
 import MuseScore 3.0
 
 MuseScore {
-    version: "3.4"
+    version: "3.5"
     description: qsTr("This plugin names notes as per your language setting")
     menuPath: "Plugins.Notes." + qsTr("Note Names (Interactive)")
     pluginType: "dock"
@@ -59,9 +64,11 @@ MuseScore {
     function getChordName(chord) {
         var text = "";
         var notes = chord.notes;
+        var sep = "\n";   // change to "," if you want them horizontally (anybody?)
         for (var i = 0; i < notes.length; i++) {
-            var sep = "\n";   // change to "," if you want them horizontally (anybody?)
-            if ( i > 0 )
+            if ((curScore.selection.elements.length && !notes[i].selected) || !notes[i].visible)
+                continue // skip notes a that are not selected or invisible
+            if (text) // only if text isn't empty
                 text = sep + text; // any but top note
             if (typeof notes[i].tpc === "undefined") // like for grace notes ?!?
                 return;

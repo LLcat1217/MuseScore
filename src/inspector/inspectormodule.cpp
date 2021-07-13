@@ -1,56 +1,28 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "inspectormodule.h"
 #include "modularity/ioc.h"
 #include "ui/iuiengine.h"
-
-using namespace mu::inspector;
-
-static void inspector_init_qrc()
-{
-    Q_INIT_RESOURCE(inspector_resources);
-}
-
-std::string InspectorModule::moduleName() const
-{
-    return "inspector";
-}
-
-#include "iinspectoradapter.h"
-#include "internal/compatibility/mu4inspectoradapter.h"
-
-void InspectorModule::registerExports()
-{
-    static std::shared_ptr<MU4InspectorAdapter> adapter = std::make_shared<MU4InspectorAdapter>();
-
-    mu::framework::ioc()->registerExport<mu::inspector::IInspectorAdapter>(moduleName(), adapter);
-}
-
-void InspectorModule::resolveImports()
-{
-}
-
-void InspectorModule::registerResources()
-{
-    inspector_init_qrc();
-}
 
 #include "models/abstractinspectormodel.h"
 #include "models/inspectorlistmodel.h"
@@ -82,6 +54,23 @@ void InspectorModule::registerResources()
 #include "types/tremolobartypes.h"
 #include "types/tremolotypes.h"
 
+using namespace mu::inspector;
+
+static void inspector_init_qrc()
+{
+    Q_INIT_RESOURCE(inspector_resources);
+}
+
+std::string InspectorModule::moduleName() const
+{
+    return "inspector";
+}
+
+void InspectorModule::registerResources()
+{
+    inspector_init_qrc();
+}
+
 void InspectorModule::registerUiTypes()
 {
     qmlRegisterType<InspectorListModel>("MuseScore.Inspector", 1, 0, "InspectorListModel");
@@ -112,5 +101,5 @@ void InspectorModule::registerUiTypes()
     qmlRegisterUncreatableType<TremoloBarTypes>("MuseScore.Inspector", 1, 0, "TremoloBarTypes", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<TremoloTypes>("MuseScore.Inspector", 1, 0, "TremoloTypes", "Not creatable as it is an enum type");
 
-    framework::ioc()->resolve<framework::IUiEngine>(moduleName())->addSourceImportPath(inspector_QML_IMPORT);
+    modularity::ioc()->resolve<ui::IUiEngine>(moduleName())->addSourceImportPath(inspector_QML_IMPORT);
 }

@@ -1,16 +1,36 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import MuseScore.Inspector 1.0
 import MuseScore.UiComponents 1.0
 import "../../common"
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property QtObject model: null
 
-    implicitHeight: contentColumn.height + topPadding + bottomPadding
-    width: parent.width
+    contentHeight: contentColumn.height
 
     Column {
         id: contentColumn
@@ -23,29 +43,28 @@ StyledPopup {
         InspectorPropertyView {
             visible: root.model ? root.model.areSettingsAvailable : false
 
-            titleText: qsTr("Tremolo bar type")
+            titleText: qsTrc("inspector", "Tremolo bar type")
             propertyItem: root.model ? root.model.type : null
 
-            StyledComboBox {
+            Dropdown {
+                id: tremolos
+
                 width: parent.width
 
-                textRoleName: "text"
-                valueRoleName: "value"
-
                 model: [
-                    { text: qsTr("Dip"), value: TremoloBarTypes.TYPE_DIP },
-                    { text: qsTr("Dive"), value: TremoloBarTypes.TYPE_DIVE },
-                    { text: qsTr("Release (Up)"), value: TremoloBarTypes.TYPE_RELEASE_UP },
-                    { text: qsTr("Inverted dip"), value: TremoloBarTypes.TYPE_INVERTED_DIP },
-                    { text: qsTr("Return"), value: TremoloBarTypes.TYPE_RETURN },
-                    { text: qsTr("Release (Down)"), value: TremoloBarTypes.TYPE_RELEASE_DOWN },
-                    { text: qsTr("Custom"), value: TremoloBarTypes.TYPE_CUSTOM }
+                    { text: qsTrc("inspector", "Dip"), value: TremoloBarTypes.TYPE_DIP },
+                    { text: qsTrc("inspector", "Dive"), value: TremoloBarTypes.TYPE_DIVE },
+                    { text: qsTrc("inspector", "Release (Up)"), value: TremoloBarTypes.TYPE_RELEASE_UP },
+                    { text: qsTrc("inspector", "Inverted dip"), value: TremoloBarTypes.TYPE_INVERTED_DIP },
+                    { text: qsTrc("inspector", "Return"), value: TremoloBarTypes.TYPE_RETURN },
+                    { text: qsTrc("inspector", "Release (Down)"), value: TremoloBarTypes.TYPE_RELEASE_DOWN },
+                    { text: qsTrc("inspector", "Custom"), value: TremoloBarTypes.TYPE_CUSTOM }
                 ]
 
-                currentIndex: root.model && !root.model.type.isUndefined ? indexOfValue(root.model.type.value) : -1
+                currentIndex: root.model && !root.model.type.isUndefined ? tremolos.indexOfValue(root.model.type.value) : -1
 
-                onValueChanged: {
-                    root.model.type.value = value
+                onCurrentValueChanged: {
+                    root.model.type.value = tremolos.currentValue
                 }
             }
         }
@@ -54,7 +73,7 @@ StyledPopup {
 
             visible: root.model ? root.model.areSettingsAvailable : false
 
-            titleText: qsTr("Click to add or remove points")
+            titleText: qsTrc("inspector", "Click to add or remove points")
             propertyItem: root.model ? root.model.curve : null
 
             GridCanvas {
@@ -88,7 +107,7 @@ StyledPopup {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
-                titleText: qsTr("Line thickness")
+                titleText: qsTrc("inspector", "Line thickness")
                 propertyItem: model ? model.lineThickness : null
 
                 IncrementalPropertyControl {
@@ -110,7 +129,7 @@ StyledPopup {
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
-                titleText: qsTr("Scale")
+                titleText: qsTrc("inspector", "Scale")
                 propertyItem: model ? model.scale : null
 
                 IncrementalPropertyControl {
@@ -133,7 +152,7 @@ StyledPopup {
         anchors.fill: parent
 
         wrapMode: Text.Wrap
-        text: qsTr("You have multiple tremolo bars selected. Select a single one to edit its settings")
+        text: qsTrc("inspector", "You have multiple tremolo bars selected. Select a single one to edit its settings")
         visible: root.model ? !root.model.areSettingsAvailable : false
     }
 }

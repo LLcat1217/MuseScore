@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Linux Music Score Editor
-//
-//  Copyright (C) 2009-2011 Werner Schweer and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include <QDir>
 #include <QAction>
@@ -34,10 +37,14 @@
 #include "libmscore/mscore.h"
 #include "libmscore/xml.h"
 
+#include "engraving/draw/qpainterprovider.h"
+
 #include "commonscene/commonscenetypes.h"
 #include "translation.h"
 
 #include "../palette_config.h"
+
+using namespace mu;
 
 namespace Ms {
 extern bool useFactorySettings;
@@ -103,8 +110,8 @@ void KeyCanvas::clear()
 
 void KeyCanvas::paintEvent(QPaintEvent*)
 {
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing, true);
+    mu::draw::Painter painter(this, "keycanvas");
+    painter.setAntialiasing(true);
     qreal wh = double(height());
     qreal ww = double(width());
     double y = wh * .5 - 2 * mu::palette::PALETTE_SPATIUM * extraMag;
@@ -120,16 +127,16 @@ void KeyCanvas::paintEvent(QPaintEvent*)
 
     QRectF r = imatrix.mapRect(QRectF(x, y, w, wh));
 
-    QRectF background = imatrix.mapRect(QRectF(0, 0, ww, wh));
+    RectF background = RectF::fromQRectF(imatrix.mapRect(QRectF(0, 0, ww, wh)));
     painter.fillRect(background, Qt::white);
 
-    QPen pen(Qt::black);
+    Pen pen(Qt::black);
     pen.setWidthF(MScore::defaultStyle().value(Sid::staffLineWidth).toDouble() * gscore->spatium());
     painter.setPen(pen);
 
     for (int i = 0; i < 5; ++i) {
         qreal yy = r.y() + i * gscore->spatium();
-        painter.drawLine(QLineF(r.x(), yy, r.x() + r.width(), yy));
+        painter.drawLine(LineF(r.x(), yy, r.x() + r.width(), yy));
     }
     if (dragElement) {
         painter.save();
@@ -158,7 +165,7 @@ void KeyCanvas::mousePressEvent(QMouseEvent* event)
     startMove = imatrix.map(QPointF(event->pos() - base));
     moveElement = 0;
     foreach (Accidental* a, accidentals) {
-        QRectF r = a->abbox();
+        QRectF r = a->abbox().toQRectF();
         if (r.contains(startMove)) {
             a->setSelected(true);
             moveElement = a;
@@ -180,7 +187,7 @@ void KeyCanvas::mouseMoveEvent(QMouseEvent* event)
     }
     QPointF p = imatrix.map(QPointF(event->pos()));
     QPointF delta = p - startMove;
-    moveElement->move(delta);
+    moveElement->move(PointF::fromQPointF(delta));
     startMove = p;
     update();
 }
@@ -205,12 +212,12 @@ void KeyCanvas::mouseReleaseEvent(QMouseEvent*)
 void KeyCanvas::dragEnterEvent(QDragEnterEvent* event)
 {
     const QMimeData* dta = event->mimeData();
-    if (dta->hasFormat(mu::MIME_SYMBOL_FORMAT)) {
-        QByteArray a = dta->data(mu::MIME_SYMBOL_FORMAT);
+    if (dta->hasFormat(mu::commonscene::MIME_SYMBOL_FORMAT)) {
+        QByteArray a = dta->data(mu::commonscene::MIME_SYMBOL_FORMAT);
 
         XmlReader e(a);
 
-        QPointF dragOffset;
+        PointF dragOffset;
         Fraction duration;
         ElementType type = Element::readType(e, &dragOffset, &duration);
         if (type != ElementType::ACCIDENTAL) {
@@ -240,7 +247,7 @@ void KeyCanvas::dragMoveEvent(QDragMoveEvent* event)
 {
     if (dragElement) {
         event->acceptProposedAction();
-        QPointF pos(imatrix.map(QPointF(event->pos())));
+        PointF pos = PointF::fromQPointF(imatrix.map(QPointF(event->pos())));
         dragElement->setPos(pos);
         update();
     }
@@ -348,7 +355,7 @@ void KeyEditor::addClicked()
     double xoff = 10000000.0;
 
     for (Accidental* a : al) {
-        QPointF pos = a->ipos();
+        PointF pos = a->ipos();
         if (pos.x() < xoff) {
             xoff = pos.x();
         }
@@ -359,12 +366,12 @@ void KeyEditor::addClicked()
     for (Accidental* a : al) {
         KeySym s;
         s.sym       = a->symbol();
-        QPointF pos = a->ipos();
+        PointF pos = a->ipos();
         pos.rx()   -= xoff;
         s.spos      = pos / spatium;
         e.keySymbols().append(s);
     }
-    KeySig* ks = new KeySig(gscore);
+    auto ks = makeElement<KeySig>(gscore);
     ks->setKeySigEvent(e);
     sp->append(ks, "custom");
     _dirty = true;

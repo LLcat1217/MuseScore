@@ -1,21 +1,22 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2020 MuseScore BVBA and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(MODULE notation)
 
@@ -30,6 +31,7 @@ set(MODULE_SRC
     ${WIDGETS_SRC}
     ${CMAKE_CURRENT_LIST_DIR}/notationmodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/notationmodule.h
+    ${CMAKE_CURRENT_LIST_DIR}/inotationproject.h
     ${CMAKE_CURRENT_LIST_DIR}/imasternotation.h
     ${CMAKE_CURRENT_LIST_DIR}/iexcerptnotation.h
     ${CMAKE_CURRENT_LIST_DIR}/inotation.h
@@ -53,9 +55,13 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/inotationplayback.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationelements.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationparts.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/notationactions.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/notationactions.h
+    ${CMAKE_CURRENT_LIST_DIR}/iinstrumentsrepository.h
+    ${CMAKE_CURRENT_LIST_DIR}/iselectinstrumentscenario.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationuiactions.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationuiactions.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/igetscore.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationproject.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationproject.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/masternotation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/masternotation.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/excerptnotation.cpp
@@ -87,6 +93,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/mscznotationreader.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/mscznotationreader.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/positionswriter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/positionswriter.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationreadersregister.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationreadersregister.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationwritersregister.cpp
@@ -103,37 +111,29 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationparts.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/masternotationparts.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/masternotationparts.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/notationactionsrepositoryfactory.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/notationactionsrepositoryfactory.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/elementactionsrepository.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/elementactionsrepository.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/measureactionsrepository.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/measureactionsrepository.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/pageactionsrepository.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/pageactionsrepository.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/inotationactionsrepositoryfactory.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/inotationactionsrepository.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/searchcommandsparser.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/searchcommandsparser.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/inotationselectionrange.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/scoreorderconverter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/scoreorderconverter.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/inotationmidievents.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationmidievents.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationmidievents.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/instrumentsconverter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/instrumentsconverter.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/instrumentsrepository.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/instrumentsrepository.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/inotationcontextmenu.h
     ${CMAKE_CURRENT_LIST_DIR}/view/notationpaintview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/notationpaintview.h
     ${CMAKE_CURRENT_LIST_DIR}/view/notationviewinputcontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/notationviewinputcontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/zoomcontrolmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/zoomcontrolmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/concertpitchcontrolmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/concertpitchcontrolmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/viewmodecontrolmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/viewmodecontrolmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/notationaccessibilitymodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/notationaccessibilitymodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/playbackcursor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/playbackcursor.h
     ${CMAKE_CURRENT_LIST_DIR}/view/noteinputcursor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/noteinputcursor.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/loopmarker.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/loopmarker.h
     ${CMAKE_CURRENT_LIST_DIR}/view/notationswitchlistmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/notationswitchlistmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/partlistmodel.cpp
@@ -146,10 +146,14 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/noteinputbarcustomisemodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/notationtoolbarmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/notationtoolbarmodel.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/internal/abstractnoteinputbaritem.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/internal/abstractnoteinputbaritem.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/internal/actionnoteinputbaritem.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/internal/actionnoteinputbaritem.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/notationcontextmenu.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/notationcontextmenu.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/notationnavigator.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/notationnavigator.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/noteinputbarcustomiseitem.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/noteinputbarcustomiseitem.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/undoredomodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/undoredomodel.h
     )
 
 set(MODULE_UI
@@ -178,9 +182,10 @@ set(MODULE_LINK
     ${FREETYPE_LIB}
     qzip
     ${Z_LIB}
-    libmscore
-    awl
+    engraving
     commonscene
+    uicomponents
+    ui
     )
 
 if (NOT MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9.0)
@@ -188,7 +193,3 @@ if (NOT MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VER
 endif (NOT MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9.0)
 
 include(${PROJECT_SOURCE_DIR}/build/module.cmake)
-
-if (MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4250")
-endif (MSVC)

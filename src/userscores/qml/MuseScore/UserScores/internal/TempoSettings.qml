@@ -1,3 +1,24 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import QtQuick 2.9
 import QtQuick.Controls 2.2
 import QtQuick.Layouts 1.3
@@ -5,27 +26,26 @@ import QtQuick.Layouts 1.3
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.UserScores 1.0
+import MuseScore.CommonScene 1.0
 
 FlatButton {
     id: root
 
-    height: 96
-
     property var model: null
 
-    property var arrowX
-    property var popupPositionX
-    property var popupPositionY: height
-    property alias oppened: popup.visible
-
-    accentButton: oppened
+    height: 96
+    accentButton: popup.visible
 
     TempoView {
-        anchors.horizontalCenter: root.horizontalCenter
-        anchors.verticalCenter: root.verticalCenter
+        anchors.centerIn: parent
 
-        tempoNote: MusicalSymbolCodes.CROTCHET // TODO: get from model
-        tempo: model.tempo
+        noteSymbol: root.model.tempo.noteSymbol
+        tempoValue: root.model.tempo.value
+
+        noteSymbolFont.pixelSize: 36
+        tempoValueFont: ui.theme.headerFont
+
+        noteSymbolTopPadding: 22
     }
 
     onClicked: {
@@ -42,9 +62,8 @@ FlatButton {
         implicitHeight: 250
         implicitWidth: 520
 
-        arrowX: root.arrowX
-        x: popupPositionX
-        y: popupPositionY
+        x: root.x - (width - root.width) / 2
+        y: root.height
 
         Column {
             anchors.fill: parent
@@ -72,48 +91,38 @@ FlatButton {
                 anchors.rightMargin: -(parent.anchors.rightMargin + popup.rightPadding)
             }
 
-            ListView {
-                anchors.left: parent.left
-                anchors.right: parent.right
+            RadioButtonGroup {
+                anchors.horizontalCenter: parent.horizontalCenter
 
                 height: 50
 
-                model: root.model.tempoMarks()
-                orientation: ListView.Horizontal
-                spacing: 4
+                model: root.model.tempoNotes()
 
                 clip: true
                 boundsBehavior: ListView.StopAtBounds
 
-                delegate: FlatButton {
+                delegate: FlatRadioButton {
                     width: 48
                     height: width
 
                     enabled: withTempo.checked
+                    checked: model.index === root.model.currentTempoNoteIndex
 
-                    Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                    onClicked: {
+                        var tempo = root.model.tempo
+                        tempo.noteIcon = modelData.noteIcon
+                        tempo.withDot = modelData.withDot
+                        root.model.tempo = tempo
+                    }
 
-                        StyledIconLabel {
-                            topPadding: 14
-                            font.family: ui.theme.musicalFont.family
-                            font.pixelSize: 24
-                            lineHeightMode: Text.FixedHeight
-                            lineHeight: 10
-                            iconCode: modelData.icon
-                        }
-
-                        StyledIconLabel {
-                            topPadding: 14
-                            font.family: ui.theme.musicalFont.family
-                            font.pixelSize: 24
-                            lineHeightMode: Text.FixedHeight
-                            lineHeight: 10
-                            iconCode: MusicalSymbolCodes.DOT
-
-                            visible: Boolean(modelData.withDot)
-                        }
+                    StyledTextLabel {
+                        topPadding: 24
+                        font.family: ui.theme.musicalFont.family
+                        font.pixelSize: 24
+                        font.letterSpacing: 1
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: 10
+                        text: modelData.noteSymbol
                     }
                 }
             }
@@ -122,10 +131,12 @@ FlatButton {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 spacing: 20
+                enabled: withTempo.checked
 
                 StyledTextLabel {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "="
+                    font: ui.theme.headerFont
                 }
 
                 IncrementalPropertyControl {
@@ -133,21 +144,21 @@ FlatButton {
 
                     implicitWidth: 126
 
-                    enabled: withTempo.checked
-
                     iconMode: iconModeEnum.hidden
-                    currentValue: root.model.tempo
+                    currentValue: root.model.tempo.value
                     step: 1
 
-                    maxValue: root.model.tempoRange().max
-                    minValue: root.model.tempoRange().min
+                    maxValue: root.model.tempoValueRange().max
+                    minValue: root.model.tempoValueRange().min
                     validator: IntInputValidator {
                         top: control.maxValue
                         bottom: control.minValue
                     }
 
                     onValueEdited: {
-                        root.model.tempo = newValue
+                        var tempo = root.model.tempo
+                        tempo.value = newValue
+                        root.model.tempo = tempo
                     }
                 }
             }

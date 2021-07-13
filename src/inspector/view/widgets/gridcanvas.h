@@ -1,24 +1,27 @@
-//=============================================================================
-//  MusE Score
-//  Linux Music Score Editor
-//
-//  Copyright (C) 2010 Werner Schweer and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
-#ifndef __GRIDCANVAS_H__
-#define __GRIDCANVAS_H__
+#ifndef MU_INSPECTOR_GRIDCANVAS_H
+#define MU_INSPECTOR_GRIDCANVAS_H
 
 #include <QQuickPaintedItem>
 #include <QPainter>
@@ -27,11 +30,12 @@
 #include "ui/iuiconfiguration.h"
 #include "libmscore/pitchvalue.h"
 
+namespace mu::inspector {
 class GridCanvas : public QQuickPaintedItem
 {
     Q_OBJECT
 
-    INJECT(inspector, mu::framework::IUiConfiguration, uiConfig)
+    INJECT(inspector, mu::ui::IUiConfiguration, uiConfig)
 
     Q_PROPERTY(QVariant pointList READ pointList WRITE setPointList NOTIFY pointListChanged)
 
@@ -94,5 +98,6 @@ private:
     /// Show negative pitch values. Happens in tremoloBarCanvas.
     bool m_showNegativeRows = false;
 };
+}
 
-#endif
+#endif // MU_INSPECTOR_GRIDCANVAS_H

@@ -1,14 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2012 Werner Schweer
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2
-//  as published by the Free Software Foundation and appearing in
-//  the file LICENCE.GPL
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #ifndef __QMLPLUGIN_H__
 #define __QMLPLUGIN_H__
@@ -60,7 +70,7 @@ class QmlPlugin : public QQuickItem
 
 protected:
     QString _filePath;              // the path of the source file, without file name
-    MuseScoreCore* msc() const;
+    virtual MuseScoreCore* msc() const = 0;
 
 public slots:
     virtual void endCmd(const QMap<QString, QVariant>&) = 0;
@@ -90,7 +100,7 @@ public:
     int mscoreVersion() const { return Ms::version(); }
     int mscoreMajorVersion() const { return majorVersion(); }
     int mscoreMinorVersion() const { return minorVersion(); }
-    int mscoreUpdateVersion() const { return updateVersion(); }
+    int mscoreUpdateVersion() const { return patchVersion(); }
     qreal mscoreDPI() const { return DPI; }
 };
 } // namespace Ms

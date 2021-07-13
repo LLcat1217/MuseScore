@@ -1,120 +1,113 @@
-import QtQuick 2.7
-import MuseScore.Ui 1.0
-import MuseScore.Dock 1.0
-import MuseScore.UiComponents 1.0
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+import QtQuick 2.15
 
-import "./Interactive"
-import "./Telemetry"
-import "./Audio"
+import MuseScore.Ui 1.0
+import MuseScore.UiComponents 1.0
+import MuseScore.Dock 1.0
+
+import MuseScore.Plugins 1.0
+import MuseScore.Audio 1.0
+
 import "./Gallery"
+import "./Interactive"
 import "./NotationDialogs"
+import "./Telemetry"
 import "./VST"
-import "./Plugins"
+import "./KeyNav"
+import "./Preferences"
+
+import "../dockwindow"
 
 DockPage {
-    id: homePage
+    id: root
 
-    objectName: "devtools"
+    objectName: "DevTools"
+    uri: "musescore://devtools"
+
+    function setCurrentCentral(name) {
+        switch (name) {
+        case "settings": root.central = settingsComp; break
+        case "gallery": root.central = galleryComp; break
+        case "interactive": root.central = interactiveComp; break
+        case "mu3dialogs": root.central = notationDialogs; break
+        case "telemetry": root.central = telemetryComp; break
+        case "audio": root.central = audioComp; break
+        case "synth": root.central = synthSettingsComp; break
+        case "midiports": root.central = midiPortsComp; break
+        case "vst": root.central = vstComponent; break
+        case "plugins": root.central = pluginsComp; break
+        case "autobot": root.central = autobotComp; break
+        case "navigation": root.central = keynavComp; break
+        }
+    }
 
     panels: [
         DockPanel {
-            id: resourcesPanel
+            id: devtoolsPanel
+
             objectName: "devtoolsPanel"
 
-            width: 200
-            color: ui.theme.backgroundPrimaryColor
+            minimumWidth: 200
+            maximumWidth: 292
 
-            DevToolsMenu {
+            allowedAreas: Qt.NoDockWidgetArea
 
-                model: [
-                    { "name": "gallery", "title": "UI Gallery" },
-                    { "name": "interactive", "title": "Interactive" },
-                    { "name": "mu3dialogs", "title": "MU3Dialogs" },
-                    { "name": "telemetry", "title": "Telemetry" },
-                    { "name": "audio", "title": "Audio" },
-                    { "name": "synth", "title": "Synth" },
-                    { "name": "midiports", "title": "Midi ports" },
-                    { "name": "vst", "title": "VST" },
-                    { "name": "plugins", "title": "Plugins" }
-                ]
+            Rectangle {
+                anchors.fill: parent
+                color: ui.theme.backgroundPrimaryColor
 
-                onSelected: {
-                    devtoolsCentral.load(name)
+                DevToolsMenu {
+                    anchors.fill: parent
+
+                    model: [
+                        { "name": "settings", "title": "Settings" },
+                        { "name": "gallery", "title": "UI Gallery" },
+                        { "name": "interactive", "title": "Interactive" },
+                        { "name": "mu3dialogs", "title": "MU3Dialogs" },
+                        { "name": "telemetry", "title": "Telemetry" },
+                        { "name": "audio", "title": "Audio" },
+                        { "name": "synth", "title": "Synth" },
+                        { "name": "midiports", "title": "MIDI ports" },
+                        { "name": "vst", "title": "VST" },
+                        { "name": "plugins", "title": "Plugins" },
+                        { "name": "autobot", "title": "Autobot" },
+                        { "name": "navigation", "title": "KeyNav" }
+                    ]
+
+                    onSelected: {
+                        root.setCurrentCentral(name)
+                    }
                 }
-
             }
         }
     ]
 
-    central: DockCentral {
-        id: devtoolsCentral
-        objectName: "devtoolsCentral"
-
-        property var currentComp: interactiveComp
-
-        function load(name) {
-            console.info("loadCentral: " + name)
-            switch (name) {
-            case "gallery": currentComp = galleryComp; break
-            case "interactive": currentComp = interactiveComp; break
-            case "mu3dialogs": currentComp = notationDialogs; break
-            case "telemetry": currentComp = telemetryComp; break
-            case "audio": currentComp = audioComp; break
-            case "synth": currentComp = synthSettingsComp; break
-            case "midiports": currentComp = midiPortsComp; break
-            case "vst": currentComp = vstComponent; break
-            case "plugins": currentComp = pluginsComp; break
-            }
-        }
-
-        Rectangle {
-
-            Loader {
-                id: centralLoader
-                anchors.fill: parent
-                sourceComponent: devtoolsCentral.currentComp
-            }
-        }
-    }
+    central: settingsComp
 
     Component {
-        id: interactiveComp
-        InteractiveTests {}
-    }
+        id: settingsComp
 
-    Component {
-        id: telemetryComp
-        Loader {
-            source: "qrc:/qml/DevTools/Telemetry/TelemetryInfo.qml"
-        }
-    }
-
-    Component{
-        id: audioComp
-        AudioEngineTests {}
-    }
-
-    Component {
-        id: synthSettingsComp
-        SynthSettings {}
-    }
-
-    Component {
-        id: midiPortsComp
-        MidiPorts {}
-    }
-
-    Component {
-        id: notationDialogs
-        MU3Dialogs {}
-    }
-
-    Component {
-        id: vstComponent
-        //safe if VST is not available
-        Loader {
-            source: "qrc:/qml/DevTools/VST/VSTTests.qml"
-        }
+        SettingsPage {}
     }
 
     Component {
@@ -124,7 +117,69 @@ DockPage {
     }
 
     Component {
+        id: interactiveComp
+
+        InteractiveTests {}
+    }
+
+    Component {
+        id: notationDialogs
+
+        MU3Dialogs {}
+    }
+
+    Component {
+        id: telemetryComp
+
+        Loader {
+            source: "qrc:/qml/DevTools/Telemetry/TelemetryInfo.qml"
+        }
+    }
+
+    Component {
+        id: audioComp
+
+        Playback {}
+    }
+
+    Component {
+        id: synthSettingsComp
+
+        SynthSettings {}
+    }
+
+    Component {
+        id: midiPortsComp
+
+        MidiPorts {}
+    }
+
+    Component {
+        id: vstComponent
+
+        //safe if VST is not available
+        Loader {
+            source: "qrc:/qml/DevTools/VST/VSTTests.qml"
+        }
+    }
+
+    Component {
         id: pluginsComp
+
         PluginsTests {}
+    }
+
+    Component {
+        id: autobotComp
+
+        Loader {
+            source: "qrc:/qml/DevTools/Autobot/AutobotControl.qml"
+        }
+    }
+
+    Component {
+        id: keynavComp
+
+        KeyNavExample {}
     }
 }

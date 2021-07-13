@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_USERSCORES_RECENTSCORESMODEL_H
 #define MU_USERSCORES_RECENTSCORESMODEL_H
 
@@ -25,17 +28,16 @@
 #include "async/asyncable.h"
 #include "actions/iactionsdispatcher.h"
 #include "iuserscoresconfiguration.h"
-#include "notation/imsczmetareader.h"
+#include "iuserscoresservice.h"
 
-namespace mu {
-namespace userscores {
+namespace mu::userscores {
 class RecentScoresModel : public QAbstractListModel, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(scores, actions::IActionsDispatcher, dispatcher)
-    INJECT(scores, IUserScoresConfiguration, configuration)
-    INJECT(scores, notation::IMsczMetaReader, msczMetaReader)
+    INJECT(userscores, actions::IActionsDispatcher, dispatcher)
+    INJECT(userscores, IUserScoresConfiguration, configuration)
+    INJECT(userscores, IUserScoresService, userScoresService)
 
 public:
     RecentScoresModel(QObject* parent = nullptr);
@@ -54,13 +56,12 @@ private:
         RoleScore
     };
 
-    void updateRecentScores(const QStringList& recentScoresPathList);
+    void updateRecentScores(const notation::MetaList& recentScoresList);
     void setRecentScores(const QVariantList& recentScores);
 
     QVariantList m_recentScores;
     QHash<int, QByteArray> m_roles;
 };
-}
 }
 
 #endif // MU_USERSCORES_RECENTSCORESMODEL_H

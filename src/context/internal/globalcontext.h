@@ -1,46 +1,42 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_CONTEXT_GLOBALCONTEXT_H
 #define MU_CONTEXT_GLOBALCONTEXT_H
 
-#include <vector>
-
 #include "../iglobalcontext.h"
-#include "shortcuts/ishortcutcontextresolver.h"
-#include "modularity/ioc.h"
-#include "playback/iplaybackcontroller.h"
-#include "iinteractive.h"
 
-namespace mu {
-namespace context {
-class GlobalContext : public IGlobalContext, public shortcuts::IShortcutContextResolver
+namespace mu::context {
+class GlobalContext : public IGlobalContext
 {
-    INJECT(context, framework::IInteractive, interactive)
-    INJECT(context, playback::IPlaybackController, playbackController)
-
 public:
-    void addMasterNotation(const notation::IMasterNotationPtr& notation) override;
-    void removeMasterNotation(const notation::IMasterNotationPtr& notation) override;
-    const std::vector<notation::IMasterNotationPtr>& masterNotations() const override;
-    bool containsMasterNotation(const io::path& path) const override;
+    void addNotationProject(const notation::INotationProjectPtr& project) override;
+    void removeNotationProject(const notation::INotationProjectPtr& project) override;
+    const std::vector<notation::INotationProjectPtr>& notationProjects() const override;
+    bool containsNotationProject(const io::path& path) const override;
 
-    void setCurrentMasterNotation(const notation::IMasterNotationPtr& notation) override;
+    void setCurrentNotationProject(const notation::INotationProjectPtr& project) override;
+    notation::INotationProjectPtr currentNotationProject() const override;
+    async::Notification currentNotationProjectChanged() const override;
+
     notation::IMasterNotationPtr currentMasterNotation() const override;
     async::Notification currentMasterNotationChanged() const override;
 
@@ -48,18 +44,17 @@ public:
     notation::INotationPtr currentNotation() const override;
     async::Notification currentNotationChanged() const override;
 
-    shortcuts::ShortcutContext currentShortcutContext() const override;
-
 private:
-    std::vector<notation::IMasterNotationPtr> m_masterNotations;
+    void doSetCurrentNotation(const notation::INotationPtr& notation);
 
-    notation::IMasterNotationPtr m_currentMasterNotation;
-    async::Notification m_currentMasterNotationChanged;
+    std::vector<notation::INotationProjectPtr> m_projects;
+
+    notation::INotationProjectPtr m_currentNotationProject;
+    async::Notification m_currentNotationProjectChanged;
 
     notation::INotationPtr m_currentNotation;
     async::Notification m_currentNotationChanged;
 };
-}
 }
 
 #endif // MU_CONTEXT_GLOBALCONTEXT_H

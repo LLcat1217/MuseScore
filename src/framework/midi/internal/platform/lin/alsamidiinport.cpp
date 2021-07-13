@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "alsamidiinport.h"
 
 #include <alsa/asoundlib.h>
@@ -34,28 +37,45 @@ struct mu::midi::AlsaMidiInPort::Alsa {
 
 using namespace mu::midi;
 
-AlsaMidiInPort::AlsaMidiInPort()
-{
-    m_alsa = std::unique_ptr<Alsa>(new Alsa());
-}
-
 AlsaMidiInPort::~AlsaMidiInPort()
 {
-    if (isRunning()) {
-        stop();
-    }
-
     if (isConnected()) {
         disconnect();
     }
 }
 
-std::vector<MidiDevice> AlsaMidiInPort::devices() const
+void AlsaMidiInPort::init()
 {
+    m_alsa = std::unique_ptr<Alsa>(new Alsa());
+
+    m_devicesListener.startWithCallback([this]() {
+        return devices();
+    });
+
+    m_devicesListener.devicesChanged().onNotify(this, [this]() {
+        bool connectedDeviceRemoved = true;
+        for (const MidiDevice& device: devices()) {
+            if (m_deviceID == device.id) {
+                connectedDeviceRemoved = false;
+            }
+        }
+
+        if (connectedDeviceRemoved) {
+            disconnect();
+        }
+
+        m_devicesChanged.notify();
+    });
+}
+
+MidiDeviceList AlsaMidiInPort::devices() const
+{
+    std::lock_guard lock(m_devicesMutex);
+
     int streams = SND_SEQ_OPEN_INPUT;
     unsigned int cap = SND_SEQ_PORT_CAP_SUBS_WRITE | SND_SEQ_PORT_CAP_WRITE;
 
-    std::vector<MidiDevice> ret;
+    MidiDeviceList ret;
 
     snd_seq_client_info_t* cinfo;
     snd_seq_port_info_t* pinfo;
@@ -74,6 +94,10 @@ std::vector<MidiDevice> AlsaMidiInPort::devices() const
 
     while (snd_seq_query_next_client(handle, cinfo) >= 0) {
         client = snd_seq_client_info_get_client(cinfo);
+        if (client == SND_SEQ_CLIENT_SYSTEM) {
+            continue;
+        }
+
         snd_seq_port_info_alloca(&pinfo);
         snd_seq_port_info_set_client(pinfo, client);
 
@@ -95,8 +119,17 @@ std::vector<MidiDevice> AlsaMidiInPort::devices() const
     return ret;
 }
 
+mu::async::Notification AlsaMidiInPort::devicesChanged() const
+{
+    return m_devicesChanged;
+}
+
 mu::Ret AlsaMidiInPort::connect(const MidiDeviceID& deviceID)
 {
+    if (!deviceExists(deviceID)) {
+        return make_ret(Err::MidiFailedConnect, "not found device, id: " + deviceID);
+    }
+
     std::vector<std::string> cp;
     strings::split(deviceID, cp, ":");
     IF_ASSERT_FAILED(cp.size() == 2) {
@@ -142,6 +175,8 @@ void AlsaMidiInPort::disconnect()
     m_alsa->port = -1;
     m_alsa->midiIn = nullptr;
     m_deviceID.clear();
+
+    stop();
 }
 
 bool AlsaMidiInPort::isConnected() const
@@ -245,7 +280,7 @@ void AlsaMidiInPort::doProcess()
 
         e = e.toMIDI20();
         if (e) {
-            m_eventReceived.send({ static_cast<tick_t>(ev->time.tick), e });
+            m_eventReceived.send(static_cast<tick_t>(ev->time.tick), e);
         }
 
         snd_seq_free_event(ev);
@@ -272,7 +307,18 @@ bool AlsaMidiInPort::isRunning() const
     return false;
 }
 
-mu::async::Channel<std::pair<tick_t, Event> > AlsaMidiInPort::eventReceived() const
+mu::async::Channel<tick_t, Event> AlsaMidiInPort::eventReceived() const
 {
     return m_eventReceived;
+}
+
+bool AlsaMidiInPort::deviceExists(const MidiDeviceID& deviceId) const
+{
+    for (const MidiDevice& device : devices()) {
+        if (device.id == deviceId) {
+            return true;
+        }
+    }
+
+    return false;
 }

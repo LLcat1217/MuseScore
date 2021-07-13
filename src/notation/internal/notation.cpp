@@ -1,33 +1,39 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include "notation.h"
 
-#include <QPainter>
 #include <QGuiApplication>
 #include <QScreen>
 
 #include "log.h"
 
 #include "libmscore/score.h"
+#include "libmscore/scorefont.h"
 #include "libmscore/page.h"
+#include "libmscore/rendermidi.h"
+#include "engraving/accessibility/accessibleelement.h"
 
 #include "notationinteraction.h"
+#include "notationmidievents.h"
 #include "notationplayback.h"
 #include "notationundostack.h"
 #include "notationstyle.h"
@@ -35,6 +41,9 @@
 #include "notationaccessibility.h"
 #include "notationmidiinput.h"
 #include "notationparts.h"
+#include "notationtypes.h"
+#include "scoreorderconverter.h"
+#include "draw/pen.h"
 
 using namespace mu::notation;
 
@@ -82,10 +91,11 @@ Notation::Notation(Ms::Score* score)
 
     m_undoStack = std::make_shared<NotationUndoStack>(this, m_notationChanged);
     m_interaction = std::make_shared<NotationInteraction>(this, m_undoStack);
-    m_playback = std::make_shared<NotationPlayback>(this);
     m_midiInput = std::make_shared<NotationMidiInput>(this, m_undoStack);
     m_accessibility = std::make_shared<NotationAccessibility>(this, m_interaction->selectionChanged());
     m_parts = std::make_shared<NotationParts>(this, m_interaction, m_undoStack);
+    m_midiEventsProvider = std::make_shared<NotationMidiEvents>(this, m_notationChanged);
+    m_playback = std::make_shared<NotationPlayback>(this, m_notationChanged, m_midiEventsProvider);
     m_style = std::make_shared<NotationStyle>(this);
     m_elements = std::make_shared<NotationElements>(this);
 
@@ -117,23 +127,55 @@ Notation::Notation(Ms::Score* score)
         notifyAboutNotationChanged();
     });
 
+    configuration()->selectionColorChanged().onReceive(this, [this](int) {
+        notifyAboutNotationChanged();
+    });
+
+    configuration()->canvasOrientation().ch.onReceive(this, [this](framework::Orientation) {
+        m_score->doLayout();
+        for (Ms::Score* score : m_score->scoreList()) {
+            score->doLayout();
+        }
+    });
+
     setScore(score);
 }
 
 Notation::~Notation()
 {
+    //! Note Dereference internal pointers before the deallocation of Ms::Score* in order to prevent access to dereferenced object
+    //! Makes sense to use std::shared_ptr<Ms::Score*> ubiquitous instead of the raw pointers
+    m_parts = nullptr;
+    m_playback = nullptr;
+    m_undoStack = nullptr;
+    m_interaction = nullptr;
+    m_midiInput = nullptr;
+    m_accessibility = nullptr;
+    m_parts = nullptr;
+    m_midiEventsProvider = nullptr;
+    m_playback = nullptr;
+    m_style = nullptr;
+    m_elements = nullptr;
+
     delete m_score;
 }
 
 void Notation::init()
 {
-    Ms::MScore::init(); // initialize libmscore
-
-    Ms::MScore::setNudgeStep(.1); // cursor key (default 0.1)
-    Ms::MScore::setNudgeStep10(1.0); // Ctrl + cursor key (default 1.0)
-    Ms::MScore::setNudgeStep50(0.01); // Alt  + cursor key (default 0.01)
-
     Ms::MScore::pixelRatio = Ms::DPI / QGuiApplication::primaryScreen()->logicalDotsPerInch();
+
+    bool isVertical = configuration()->canvasOrientation().val == framework::Orientation::Vertical;
+    Ms::MScore::setVerticalOrientation(isVertical);
+
+    Ms::MScore::panPlayback = configuration()->isAutomaticallyPanEnabled();
+    Ms::MScore::playRepeats = configuration()->isPlayRepeatsEnabled();
+
+    for (int i = 0; i < VOICES; ++i) {
+        Ms::MScore::selectColor[i] = configuration()->selectionColor(i);
+    }
+
+    Ms::MScore::readDefaultStyle(configuration()->defaultStyleFilePath().toQString());
+    Ms::MScore::readPartStyle(configuration()->partStyleFilePath().toQString());
 }
 
 void Notation::setScore(Ms::Score* score)
@@ -142,7 +184,7 @@ void Notation::setScore(Ms::Score* score)
 
     if (score) {
         static_cast<NotationInteraction*>(m_interaction.get())->init();
-        static_cast<NotationPlayback*>(m_playback.get())->init();
+        static_cast<NotationPlayback*>(m_playback.get())->init(m_parts);
     }
 }
 
@@ -202,6 +244,11 @@ void Notation::setMetaInfo(const Meta& meta)
     score()->setMetaTags(tags);
 }
 
+ScoreOrder Notation::scoreOrder() const
+{
+    return m_score ? ScoreOrderConverter::convertScoreOrder(m_score->scoreOrder()) : ScoreOrder();
+}
+
 INotationPtr Notation::clone() const
 {
     return std::make_shared<Notation>(score()->clone());
@@ -232,7 +279,7 @@ ViewMode Notation::viewMode() const
     return score()->layoutMode();
 }
 
-void Notation::paint(QPainter* painter, const QRectF& frameRect)
+void Notation::paint(mu::draw::Painter* painter, const RectF& frameRect)
 {
     const QList<Ms::Page*>& pages = score()->pages();
     if (pages.empty()) {
@@ -256,10 +303,10 @@ void Notation::paint(QPainter* painter, const QRectF& frameRect)
     static_cast<NotationInteraction*>(m_interaction.get())->paint(painter);
 }
 
-void Notation::paintPages(QPainter* painter, const QRectF& frameRect, const QList<Ms::Page*>& pages, bool paintBorders) const
+void Notation::paintPages(draw::Painter* painter, const RectF& frameRect, const QList<Ms::Page*>& pages, bool paintBorders) const
 {
     for (Ms::Page* page : pages) {
-        QRectF pageRect(page->abbox().translated(page->pos()));
+        RectF pageRect(page->abbox().translated(page->pos()));
 
         if (pageRect.right() < frameRect.left()) {
             continue;
@@ -273,27 +320,34 @@ void Notation::paintPages(QPainter* painter, const QRectF& frameRect, const QLis
             paintPageBorder(painter, page);
         }
 
-        QPointF pagePosition(page->pos());
+        PointF pagePosition(page->pos());
         painter->translate(pagePosition);
-        painter->fillRect(page->bbox(), configuration()->pageColor());
-        paintElements(painter, page->elements());
+        paintForeground(painter, page->bbox());
+        painter->setClipping(true);
+        painter->setClipRect(page->bbox());
+
+        QList<Element*> elements = page->items(frameRect.translated(-page->pos()));
+        Ms::paintElements(*painter, elements);
+
         painter->translate(-pagePosition);
+        painter->setClipping(false);
     }
 }
 
-void Notation::paintPageBorder(QPainter* painter, const Ms::Page* page) const
+void Notation::paintPageBorder(draw::Painter* painter, const Ms::Page* page) const
 {
-    QRectF boundingRect(page->canvasBoundingRect());
+    using namespace mu::draw;
+    RectF boundingRect(page->canvasBoundingRect());
 
-    painter->setBrush(Qt::NoBrush);
-    painter->setPen(QPen(configuration()->borderColor(), configuration()->borderWidth()));
+    painter->setBrush(BrushStyle::NoBrush);
+    painter->setPen(Pen(configuration()->borderColor(), configuration()->borderWidth()));
     painter->drawRect(boundingRect);
 
     if (!score()->showPageborders()) {
         return;
     }
 
-    painter->setBrush(Qt::NoBrush);
+    painter->setBrush(BrushStyle::NoBrush);
     painter->setPen(Ms::MScore::frameMarginColor);
     boundingRect.adjust(page->lm(), page->tm(), -page->rm(), -page->bm());
     painter->drawRect(boundingRect);
@@ -303,37 +357,20 @@ void Notation::paintPageBorder(QPainter* painter, const Ms::Page* page) const
     }
 }
 
-void Notation::paintElements(QPainter* painter, const QList<Element*>& elements) const
+void Notation::paintForeground(mu::draw::Painter* painter, const RectF& pageRect) const
 {
-    QList<Ms::Element*> sortedElements = elements;
-    std::sort(sortedElements.begin(), sortedElements.end(), [](Ms::Element* e1, Ms::Element* e2) {
-        if (e1->z() == e2->z()) {
-            if (e1->selected()) {
-                return false;
-            } else if (e2->selected()) {
-                return true;
-            } else if (!e1->visible()) {
-                return true;
-            } else if (!e2->visible()) {
-                return false;
-            } else {
-                return e1->track() > e2->track();
-            }
-        }
-        return e1->z() <= e2->z();
-    });
+    if (score()->printing()) {
+        painter->fillRect(pageRect, Qt::white);
+        return;
+    }
 
-    for (const Ms::Element* element : sortedElements) {
-        if (!element->visible()) {
-            continue;
-        }
+    QString wallpaperPath = configuration()->foregroundWallpaperPath().toQString();
 
-        element->itemDiscovered = false;
-        QPointF elementPosition(element->pagePos());
-
-        painter->translate(elementPosition);
-        element->draw(painter);
-        painter->translate(-elementPosition);
+    if (configuration()->foregroundUseColor() || wallpaperPath.isEmpty()) {
+        painter->fillRect(pageRect, configuration()->foregroundColor());
+    } else {
+        QPixmap pixmap(wallpaperPath);
+        painter->drawTiledPixmap(pageRect, pixmap);
     }
 }
 

@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FIT-0NESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "notationundostack.h"
 
@@ -41,17 +44,23 @@ bool NotationUndoStack::canUndo() const
     return undoStack()->canUndo();
 }
 
-void NotationUndoStack::undo()
+void NotationUndoStack::undo(Ms::EditData* editData)
 {
     IF_ASSERT_FAILED(score()) {
         return;
     }
 
-    score()->undoRedo(true, nullptr);
+    score()->undoRedo(true, editData);
     masterScore()->setSaved(isStackClean());
 
     notifyAboutNotationChanged();
-    notifyAboutStackStateChanged();
+    notifyAboutUndo();
+    notifyAboutStateChanged();
+}
+
+Notification NotationUndoStack::undoNotification() const
+{
+    return m_undoNotification;
 }
 
 bool NotationUndoStack::canRedo() const
@@ -63,17 +72,23 @@ bool NotationUndoStack::canRedo() const
     return undoStack()->canRedo();
 }
 
-void NotationUndoStack::redo()
+void NotationUndoStack::redo(Ms::EditData* editData)
 {
     IF_ASSERT_FAILED(score()) {
         return;
     }
 
-    score()->undoRedo(false, nullptr);
+    score()->undoRedo(false, editData);
     masterScore()->setSaved(isStackClean());
 
     notifyAboutNotationChanged();
-    notifyAboutStackStateChanged();
+    notifyAboutRedo();
+    notifyAboutStateChanged();
+}
+
+Notification NotationUndoStack::redoNotification() const
+{
+    return m_redoNotification;
 }
 
 void NotationUndoStack::prepareChanges()
@@ -91,10 +106,10 @@ void NotationUndoStack::rollbackChanges()
         return;
     }
 
-    score()->endCmd(false, true);
+    score()->endCmd(true);
     masterScore()->setSaved(isStackClean());
 
-    notifyAboutStackStateChanged();
+    notifyAboutStateChanged();
 }
 
 void NotationUndoStack::commitChanges()
@@ -106,7 +121,7 @@ void NotationUndoStack::commitChanges()
     score()->endCmd();
     masterScore()->setSaved(isStackClean());
 
-    notifyAboutStackStateChanged();
+    notifyAboutStateChanged();
 }
 
 mu::async::Notification NotationUndoStack::stackChanged() const
@@ -134,9 +149,19 @@ void NotationUndoStack::notifyAboutNotationChanged()
     m_notationChanged.notify();
 }
 
-void NotationUndoStack::notifyAboutStackStateChanged()
+void NotationUndoStack::notifyAboutStateChanged()
 {
     m_stackStateChanged.notify();
+}
+
+void NotationUndoStack::notifyAboutUndo()
+{
+    m_undoNotification.notify();
+}
+
+void NotationUndoStack::notifyAboutRedo()
+{
+    m_redoNotification.notify();
 }
 
 bool NotationUndoStack::isStackClean() const

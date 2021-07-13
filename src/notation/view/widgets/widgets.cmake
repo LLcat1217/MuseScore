@@ -10,11 +10,13 @@ set (WIDGETS_UI
     ${CMAKE_CURRENT_LIST_DIR}/editstringdata.ui
     ${CMAKE_CURRENT_LIST_DIR}/editpitch.ui
     ${CMAKE_CURRENT_LIST_DIR}/breaksdialog.ui
+    ${CMAKE_CURRENT_LIST_DIR}/pagesettings.ui
     ${CMAKE_CURRENT_LIST_DIR}/scoreproperties.ui
     ${CMAKE_CURRENT_LIST_DIR}/transposedialog.ui
     ${CMAKE_CURRENT_LIST_DIR}/selectnotedialog.ui
     ${CMAKE_CURRENT_LIST_DIR}/selectdialog.ui
     ${CMAKE_CURRENT_LIST_DIR}/tupletdialog.ui
+    ${CMAKE_CURRENT_LIST_DIR}/voicing_select.ui
     )
 
 set(WIDGETS_SRC
@@ -24,6 +26,8 @@ set(WIDGETS_SRC
     ${CMAKE_CURRENT_LIST_DIR}/editstyle.h
     ${CMAKE_CURRENT_LIST_DIR}/alignSelect.cpp
     ${CMAKE_CURRENT_LIST_DIR}/alignSelect.h
+    ${CMAKE_CURRENT_LIST_DIR}/colorlabel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/colorlabel.h
     ${CMAKE_CURRENT_LIST_DIR}/fontStyleSelect.cpp
     ${CMAKE_CURRENT_LIST_DIR}/fontStyleSelect.h
     ${CMAKE_CURRENT_LIST_DIR}/offsetSelect.cpp
@@ -38,6 +42,8 @@ set(WIDGETS_SRC
     ${CMAKE_CURRENT_LIST_DIR}/editpitch.h
     ${CMAKE_CURRENT_LIST_DIR}/breaksdialog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/breaksdialog.h
+    ${CMAKE_CURRENT_LIST_DIR}/pagesettings.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/pagesettings.h
     ${CMAKE_CURRENT_LIST_DIR}/scoreproperties.cpp
     ${CMAKE_CURRENT_LIST_DIR}/scoreproperties.h
     ${CMAKE_CURRENT_LIST_DIR}/transposedialog.cpp
@@ -48,4 +54,6 @@ set(WIDGETS_SRC
     ${CMAKE_CURRENT_LIST_DIR}/selectdialog.h
     ${CMAKE_CURRENT_LIST_DIR}/tupletdialog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/tupletdialog.h
+    ${CMAKE_CURRENT_LIST_DIR}/voicingSelect.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/voicingSelect.h
     )

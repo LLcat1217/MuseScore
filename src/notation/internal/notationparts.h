@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FIT-0NESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifndef MU_NOTATION_NOTATIONPARTS_H
 #define MU_NOTATION_NOTATIONPARTS_H
 
@@ -33,13 +36,14 @@ public:
     ~NotationParts() override;
 
     async::NotifyList<const Part*> partList() const override;
-    async::NotifyList<instruments::Instrument> instrumentList(const ID& partId) const override;
+    async::NotifyList<Instrument> instrumentList(const ID& partId) const override;
     async::NotifyList<const Staff*> staffList(const ID& partId, const ID& instrumentId) const override;
 
     ValCh<bool> canChangeInstrumentVisibility(const ID& instrumentId, const ID& fromPartId) const override;
     bool voiceVisible(int voiceIndex) const override;
 
-    void setInstruments(const instruments::InstrumentList& instruments) override;
+    void setParts(const PartInstrumentList& parts) override;
+    void setScoreOrder(const ScoreOrder& order) override;
     void setPartVisible(const ID& partId, bool visible) override;
     void setInstrumentVisible(const ID& instrumentId, const ID& fromPartId, bool visible) override;
     void setStaffVisible(const ID& staffId, bool visible) override;
@@ -47,7 +51,7 @@ public:
     void setVoiceVisible(const ID& staffId, int voiceIndex, bool visible) override;
     void setPartName(const ID& partId, const QString& name) override;
     void setPartSharpFlat(const ID& partId, const SharpFlat& sharpFlat) override;
-    void setPartTransposition(const ID& partId, const instruments::Interval& transpose) override;
+    void setPartTransposition(const ID& partId, const Interval& transpose) override;
     void setInstrumentName(const ID& instrumentId, const ID& fromPartId, const QString& name) override;
     void setInstrumentAbbreviature(const ID& instrumentId, const ID& fromPartId, const QString& abbreviature) override;
     void setStaffType(const ID& staffId, StaffType type) override;
@@ -65,12 +69,12 @@ public:
                          const ID& destinationInstrumentId, InsertMode mode = InsertMode::Before) override;
     void moveStaves(const IDList& sourceStavesIds, const ID& destinationStaffId, InsertMode mode = InsertMode::Before) override;
 
-    void appendDoublingInstrument(const instruments::Instrument& instrument, const ID& destinationPartId) override;
+    void appendDoublingInstrument(const Instrument& instrument, const ID& destinationPartId) override;
     void appendStaff(Staff* staff, const ID& destinationPartId) override;
 
     void cloneStaff(const ID& sourceStaffId, const ID& destinationStaffId) override;
 
-    void replaceInstrument(const ID& instrumentId, const ID& fromPartId, const instruments::Instrument& newInstrument) override;
+    void replaceInstrument(const ID& instrumentId, const ID& fromPartId, const Instrument& newInstrument) override;
 
     async::Notification partsChanged() const override;
 
@@ -144,21 +148,25 @@ private:
     void appendPart(Part* part);
     int resolvePartIndex(Part* part) const;
 
-    void appendStaves(Part* part, const instruments::Instrument& instrument);
+    void appendStaves(Part* part, const Instrument& instrument);
 
-    void removeMissingInstruments(const instruments::InstrumentList& instruments);
-    void appendNewInstruments(const instruments::InstrumentList& instruments);
-    void sortParts(const instruments::InstrumentList& instruments);
+    void removeMissingParts(const PartInstrumentList& parts);
+    void appendNewParts(const PartInstrumentList& parts);
+    void updateSoloist(const PartInstrumentList& parts);
+    void sortParts(const PartInstrumentList& parts, const Ms::Score* score, const QList<Ms::Staff*>& originalStaves);
+
+    int resolveInstrumentNumber(const Instruments& newInstruments, const Instrument& currentInstrument) const;
 
     IDList allInstrumentsIds() const;
     int lastStaffIndex() const;
 
-    void initStaff(Staff* staff, const instruments::Instrument& instrument, const Ms::StaffType* staffType, int cleffIndex);
+    void initStaff(Staff* staff, const Instrument& instrument, const Ms::StaffType* staffType, int cleffIndex);
 
+    void notifyAboutPartChanged(const ID& partId) const;
     void notifyAboutStaffChanged(const ID& staffId) const;
     void notifyAboutInstrumentsChanged(const ID& partId) const;
 
-    async::ChangedNotifier<instruments::Instrument>* partNotifier(const ID& partId) const;
+    async::ChangedNotifier<Instrument>* partNotifier(const ID& partId) const;
     async::ChangedNotifier<const Staff*>* instrumentNotifier(const ID& instrumentId, const ID& fromPartId) const;
 
     QString formatPartName(const Part* part) const;
@@ -174,7 +182,7 @@ private:
     async::Notification m_partsChanged;
 
     mutable async::ChangedNotifier<const Part*>* m_partsNotifier = nullptr;
-    mutable std::map<ID, async::ChangedNotifier<instruments::Instrument>*> m_partsNotifiersMap;
+    mutable std::map<ID, async::ChangedNotifier<Instrument>*> m_partsNotifiersMap;
     mutable QHash<InstrumentKey, async::ChangedNotifier<const Staff*>*> m_instrumentsNotifiersHash;
     mutable QHash<InstrumentKey, ValCh<bool> > m_canChangeInstrumentsVisibilityHash;
 };

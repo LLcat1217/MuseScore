@@ -1,31 +1,32 @@
-#=============================================================================
-#  MuseScore
-#  Music Composition & Notation
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore-CLA-applies
 #
-#  Copyright (C) 2020 MuseScore BVBA and others
+# MuseScore
+# Music Composition & Notation
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License version 2.
+# Copyright (C) 2021 MuseScore BVBA and others
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 3 as
+# published by the Free Software Foundation.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#=============================================================================
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 set(MODULE audio)
-
-include(${PROJECT_SOURCE_DIR}/thirdparty/soloud/soloud.cmake)
 
 include(GetPlatformInfo)
 if (OS_IS_WIN)
     set(DRIVER_SRC
-        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmmdriver.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmmdriver.h
+        #${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmmdriver.cpp
+        #${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winmmdriver.h
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wincoreaudiodriver.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/wincoreaudiodriver.h
     )
 elseif(OS_IS_LIN)
     set(DRIVER_SRC
@@ -37,6 +38,10 @@ elseif(OS_IS_MAC)
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.cpp
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.h
     )
+
+    # Conflicted with AudioBuffer
+    set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/internal/platform/osx/osxaudiodriver.cpp
+                                PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 elseif(OS_IS_WASM)
     set(DRIVER_SRC
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/web/webaudiodriver.cpp
@@ -44,60 +49,128 @@ elseif(OS_IS_WASM)
     )
 endif()
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/fluidsynth fluidsynth)
+
 set(MODULE_SRC
-    ${SOLOUD_SRC}
-    ${DRIVER_SRC}
+
+    # Common public
     ${CMAKE_CURRENT_LIST_DIR}/audiomodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/audiomodule.h
     ${CMAKE_CURRENT_LIST_DIR}/audioerrors.h
-    ${CMAKE_CURRENT_LIST_DIR}/audiotypes.h
-    ${CMAKE_CURRENT_LIST_DIR}/iaudioplayer.h
-    ${CMAKE_CURRENT_LIST_DIR}/iaudioengine.h
+    ${CMAKE_CURRENT_LIST_DIR}/iaudioconfiguration.h
+    ${CMAKE_CURRENT_LIST_DIR}/iaudiostream.h
+    ${CMAKE_CURRENT_LIST_DIR}/isynthesizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/isynthesizersregister.h
+    ${CMAKE_CURRENT_LIST_DIR}/isoundfontsprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/iaudiodriver.h
     ${CMAKE_CURRENT_LIST_DIR}/iaudiosource.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/iaudiodriver.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/sinesource.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/sinesource.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/imidisource.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/midisource.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/midisource.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/rpcmidisource.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/rpcmidisource.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/loopsource.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/loopsource.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/audiointernaltypes.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/audioengine.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/audioengine.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/audioplayer.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/audioplayer.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/workertypes.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/rpcsourcebase.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/rpcsourcebase.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/irpcaudiostreamchannel.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audiothreadstreamworker.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audiothreadstreamworker.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/queuedrpcstreamchannel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/queuedrpcstreamchannel.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/rpcstreamchannelbase.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/rpcstreamchannelbase.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/rpcstreamcontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/rpcstreamcontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/midistreamcontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/midistreamcontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/wavstreamcontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/wavstreamcontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/streamcontrollerbase.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/streamcontrollerbase.h
-    ${CMAKE_CURRENT_LIST_DIR}/devtools/audioenginedevtools.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/devtools/audioenginedevtools.h
+    ${CMAKE_CURRENT_LIST_DIR}/synthtypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/audiotypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/iplayer.h
+    ${CMAKE_CURRENT_LIST_DIR}/itracks.h
+    ${CMAKE_CURRENT_LIST_DIR}/iaudiooutput.h
+    ${CMAKE_CURRENT_LIST_DIR}/iplayback.h
+
+    # Common internal
+    ${CMAKE_CURRENT_LIST_DIR}/internal/iaudiobuffer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audioconfiguration.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audioconfiguration.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiobuffer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiobuffer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiothread.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiothread.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiosanitizer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiosanitizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audiomathutils.h
+
+    # Driver
+    ${DRIVER_SRC}
+
+    # Worker
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/ifxprocessor.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/imixerchannel.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/playback.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/playback.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/abstractaudiosource.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/abstractaudiosource.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/samplerateconvertor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/samplerateconvertor.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audiostream.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audiostream.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audioplayer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audioplayer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/midiaudiosource.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/midiaudiosource.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/sinesource.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/sinesource.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/noisesource.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/noisesource.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audioengine.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audioengine.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/tracksequence.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/tracksequence.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/mixer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/mixer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/mixerchannel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/mixerchannel.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/iclock.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/clock.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/clock.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/equaliser.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/equaliser.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/trackshandler.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/trackshandler.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/playerhandler.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/playerhandler.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audiooutputhandler.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/audiooutputhandler.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/itracksequence.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/igettracksequence.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/igettracks.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/isequenceplayer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/isequenceio.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/sequenceplayer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/sequenceplayer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/sequenceio.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/sequenceio.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/worker/track.h
+
+
+    # Synthesizers
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/sanitysynthesizer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/sanitysynthesizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidsynth.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/fluidsynth/fluidsynth.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/synthesizercontroller.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/synthesizercontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/synthesizersregister.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/synthesizersregister.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/soundfontsprovider.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synthesizers/soundfontsprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/synthssettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/synthssettingsmodel.h
+
+    # DevTools
+    ${CMAKE_CURRENT_LIST_DIR}/devtools/waveformmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/devtools/waveformmodel.h
+    )                           
+
+set(FLUIDSYNTH_DIR ${PROJECT_SOURCE_DIR}/thirdparty/fluidsynth/fluidsynth-2.1.4)
+set (FLUIDSYNTH_INC
+    ${FLUIDSYNTH_DIR}/include
+    ${FLUIDSYNTH_DIR}/src
+    ${FLUIDSYNTH_DIR}/src/external
+    ${FLUIDSYNTH_DIR}/src/utils
+    ${FLUIDSYNTH_DIR}/src/midi
+    ${FLUIDSYNTH_DIR}/src/rvoice
+    ${FLUIDSYNTH_DIR}/src/sfloader
+    ${FLUIDSYNTH_DIR}/src/bindings
+    ${FLUIDSYNTH_DIR}/src/synth
+    ${FLUIDSYNTH_DIR}/src/drivers
     )
 
-set(MODULE_DEF
-    ${SOLOUD_DEF}
-    )
-
-set(MODULE_INCLUDE
-    ${CMAKE_CURRENT_LIST_DIR}
-    ${SOLOUD_INC}
+set (MODULE_INCLUDE
+    ${FLUIDSYNTH_INC}
     )
 
 if(OS_IS_WIN)
@@ -110,13 +183,10 @@ if(OS_IS_LIN)
     set(MODULE_INCLUDE ${MODULE_INCLUDE} ${ALSA_INCLUDE_DIRS} )
 endif()
 
-set(MODULE_USE_PCH_NONE ON) # strange error
-set(MODULE_USE_UNITY_NONE ON) # soloud not compile
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
+set(MODULE_LINK ${MODULE_LINK} fluidsynth )
 
-# for soloud
-target_no_warning(${MODULE} -Wno-unused-parameter)
-target_no_warning(${MODULE} -Wno-conversion)
-target_no_warning(${MODULE} -Wno-uninitialized)
-target_no_warning(${MODULE} -Wno-array-bounds)
-target_no_warning(${MODULE} -WMSVC-no-hides-previous)
+set(MODULE_QRC audio.qrc)
+
+set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml)
+
+include(${PROJECT_SOURCE_DIR}/build/module.cmake)

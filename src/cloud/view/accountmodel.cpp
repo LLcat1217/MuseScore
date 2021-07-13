@@ -1,25 +1,30 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "accountmodel.h"
 
-#include "iaccountcontroller.h"
+#include "iauthorizationservice.h"
+
+#include "log.h"
 
 using namespace mu::cloud;
 
@@ -37,14 +42,14 @@ AccountModel::AccountModel(QObject* parent)
 
 void AccountModel::load()
 {
-    ValCh<AccountInfo> infoCh = accountController()->accountInfo();
+    ValCh<AccountInfo> infoCh = authorizationService()->accountInfo();
     setAccountInfo(infoCh.val);
 
     infoCh.ch.onReceive(this, [this](const AccountInfo& info) {
         setAccountInfo(info);
     });
 
-    ValCh<bool> userAuthorizedCh = accountController()->userAuthorized();
+    ValCh<bool> userAuthorizedCh = authorizationService()->userAuthorized();
     setUserAuthorized(userAuthorizedCh.val);
 
     userAuthorizedCh.ch.onReceive(this, [this](bool authorized) {
@@ -74,17 +79,17 @@ void AccountModel::setAccountInfo(const AccountInfo& info)
 
 void AccountModel::createAccount()
 {
-    accountController()->createAccount();
+    NOT_IMPLEMENTED;
 }
 
 void AccountModel::signIn()
 {
-    accountController()->signIn();
+    authorizationService()->signIn();
 }
 
 void AccountModel::signOut()
 {
-    accountController()->signOut();
+    authorizationService()->signOut();
 }
 
 bool AccountModel::userAuthorized() const

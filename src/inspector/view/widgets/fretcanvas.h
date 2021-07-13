@@ -1,43 +1,47 @@
-//=============================================================================
-//  MuseScore
-//  Linux Music Score Editor
-//
-//  Copyright (C) 2009 Werner Schweer and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
-#ifndef __FRETCANVAS_H__
-#define __FRETCANVAS_H__
+#ifndef MU_INSPECTOR_FRETCANVAS_H
+#define MU_INSPECTOR_FRETCANVAS_H
 
 #include <QQuickPaintedItem>
 #include <QPainter>
 #include <QVariant>
 
+#include "context/iglobalcontext.h"
 #include "fret.h"
 
-//---------------------------------------------------------
-//   FretCanvas
-//---------------------------------------------------------
-
+namespace mu::inspector {
 class FretCanvas : public QQuickPaintedItem
 {
+    INJECT(instruments, context::IGlobalContext, globalContext)
+
     Q_OBJECT
 
     Q_PROPERTY(QVariant diagram READ diagram WRITE setFretDiagram NOTIFY diagramChanged)
     Q_PROPERTY(bool isBarreModeOn READ isBarreModeOn WRITE setIsBarreModeOn NOTIFY isBarreModeOnChanged)
     Q_PROPERTY(bool isMultipleDotsModeOn READ isMultipleDotsModeOn WRITE setIsMultipleDotsModeOn NOTIFY isMultipleDotsModeOnChanged)
     Q_PROPERTY(int currentFretDotType READ currentFretDotType WRITE setCurrentFretDotType NOTIFY currentFretDotTypeChanged)
+    Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged)
 
 public:
     explicit FretCanvas(QQuickItem* parent = nullptr);
@@ -54,10 +58,13 @@ public:
     bool isBarreModeOn() const;
     bool isMultipleDotsModeOn() const;
 
+    QColor color() const;
+
 public slots:
     void setCurrentFretDotType(int currentFretDotType);
     void setIsBarreModeOn(bool isBarreModeOn);
     void setIsMultipleDotsModeOn(bool isMultipleDotsModeOn);
+    void setColor(QColor color);
 
 signals:
     void diagramChanged(QVariant diagram);
@@ -66,10 +73,12 @@ signals:
     void isBarreModeOnChanged(bool isBarreModeOn);
     void isMultipleDotsModeOnChanged(bool isMultipleDotsModeOn);
 
+    void colorChanged(QColor color);
+
 private:
     void draw(QPainter* painter);
     void mousePressEvent(QMouseEvent*) override;
-    void mouseMoveEvent(QMouseEvent*) override;
+    void hoverMoveEvent(QHoverEvent*) override;
 
     void paintDotSymbol(QPainter* p, QPen& pen, qreal y, qreal x, qreal dotd, Ms::FretDotType dtype);
     void getPosition(const QPointF& pos, int* string, int* fret);
@@ -83,6 +92,9 @@ private:
     Ms::FretDotType m_currentDtype = Ms::FretDotType::NORMAL;
     bool m_barreMode = false;
     bool m_multidotMode = false;
-};
 
-#endif
+    QColor m_color;
+};
+}
+
+#endif // MU_INSPECTOR_FRETCANVAS_H

@@ -1,21 +1,24 @@
-//=============================================================================
-//  MuseScore
-//  Music Composition & Notation
-//
-//  Copyright (C) 2020 MuseScore BVBA and others
-//
-//  This program is free software; you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License version 2.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program; if not, write to the Free Software
-//  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//=============================================================================
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ * MuseScore-CLA-applies
+ *
+ * MuseScore
+ * Music Composition & Notation
+ *
+ * Copyright (C) 2021 MuseScore BVBA and others
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 #include "uiengine.h"
 
@@ -32,7 +35,7 @@ namespace Ms {
 extern QString mscoreGlobalShare; //! FIXME Need to remove global variable
 }
 
-using namespace mu::framework;
+using namespace mu::ui;
 
 UiEngine* UiEngine::instance()
 {
@@ -46,12 +49,15 @@ UiEngine::UiEngine()
     m_interactiveProvider = std::make_shared<InteractiveProvider>();
     m_api = new QmlApi(this);
     m_tooltip = new QmlToolTip(this);
-    m_theme = new Theme(this);
+
+    //! NOTE At the moment, UiTheme is also QProxyStyle
+    //! Inside the theme, QApplication::setStyle(this) is calling and the QStyleSheetStyle becomes as parent.
+    //! So, the UiTheme will be deleted when will deleted the application (as a child of QStyleSheetStyle).
+    m_theme = new UiTheme();
 }
 
 UiEngine::~UiEngine()
 {
-    delete m_theme;
     delete m_translation;
 }
 
@@ -64,6 +70,21 @@ void UiEngine::quit()
     m_engine->quit();
     delete m_engine;
     m_engine = nullptr;
+}
+
+QQuickItem* UiEngine::rootItem() const
+{
+    return m_rootItem;
+}
+
+void UiEngine::setRootItem(QQuickItem* rootItem)
+{
+    if (m_rootItem == rootItem) {
+        return;
+    }
+
+    m_rootItem = rootItem;
+    emit rootItemChanged(m_rootItem);
 }
 
 QQmlEngine* UiEngine::engine()
@@ -138,7 +159,7 @@ QmlApi* UiEngine::api() const
     return m_api;
 }
 
-Theme* UiEngine::theme() const
+UiTheme* UiEngine::theme() const
 {
     return m_theme;
 }
